@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PR Review Sorter — demo</title>
+    <!-- Reuse the real extension styles so the demo matches the extension exactly. -->
+    <link rel="stylesheet" href="../extension/styles.css" />
+    <style>
+      :root {
+        --gh-bg: #ffffff;
+        --gh-subtle: #f6f8fa;
+        --gh-border: #d0d7de;
+        --gh-fg: #1f2328;
+        --gh-muted: #656d76;
+        --gh-accent: #0969da;
+        --gh-add: #1a7f37;
+        --gh-del: #cf222e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--gh-subtle);
+        color: var(--gh-fg);
+        font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      }
+      .pr-topbar {
+        background: var(--gh-bg);
+        border-bottom: 1px solid var(--gh-border);
+        padding: 16px 24px 0;
+      }
+      .pr-title { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
+      .pr-title .pr-num { color: var(--gh-muted); font-weight: 400; }
+      .pr-sub { color: var(--gh-muted); font-size: 13px; margin-bottom: 12px; }
+      .pr-tabs { display: flex; gap: 24px; font-size: 14px; }
+      .pr-tab { padding: 8px 0; color: var(--gh-fg); }
+      .pr-tab.active { border-bottom: 2px solid #fd8c73; font-weight: 600; }
+      .pr-tab .count {
+        background: rgba(175,184,193,0.2); border-radius: 999px;
+        padding: 0 6px; margin-left: 4px; font-size: 12px;
+      }
+      .caption {
+        max-width: 920px; margin: 14px auto 0; padding: 0 16px;
+        color: var(--gh-muted); font-size: 13px; height: 18px;
+      }
+      .caption b { color: var(--gh-fg); }
+      #files {
+        max-width: 920px;
+        margin: 8px auto 60px;
+        padding: 0 16px;
+        position: relative;
+      }
+      .file {
+        background: var(--gh-bg);
+        border: 1px solid var(--gh-border);
+        border-radius: 8px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        will-change: transform;
+      }
+      .file-header {
+        display: flex;
+        align-items: center;
+        background: var(--gh-subtle);
+        border-bottom: 1px solid var(--gh-border);
+        padding: 8px 12px;
+      }
+      .file-info { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+      .file-chevron { color: var(--gh-muted); }
+      .file-path {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        color: var(--gh-fg);
+        text-decoration: none;
+      }
+      .diffstat { margin-left: auto; font-size: 12px; font-family: ui-monospace, monospace; }
+      .diffstat .add { color: var(--gh-add); }
+      .diffstat .del { color: var(--gh-del); }
+      .file-body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+      .diff-row { display: flex; padding: 0 8px; line-height: 18px; white-space: pre; }
+      .diff-row .ln { width: 34px; color: var(--gh-muted); text-align: right; padding-right: 10px; user-select: none; }
+      .diff-row.add { background: #e6ffec; }
+      .diff-row.add .code { color: #10321a; }
+      .diff-row.del { background: #ffebe9; }
+      .diff-row.del .code { color: #4a1113; }
+      /* Panel enters via a wrapper transform the demo controls. */
+      #prrs-panel { transition: none; }
+    </style>
+  </head>
+  <body>
+    <div class="pr-topbar">
+      <h1 class="pr-title"><span>Add session-based authentication</span> <span class="pr-num">#128</span></h1>
+      <div class="pr-sub">bnaya wants to merge 8 commits into <code>main</code></div>
+      <div class="pr-tabs">
+        <span class="pr-tab">Conversation</span>
+        <span class="pr-tab">Commits</span>
+        <span class="pr-tab active">Files changed <span class="count">8</span></span>
+      </div>
+    </div>
+
+    <div class="caption" id="caption">Files as GitHub shows them — alphabetical.</div>
+    <div id="files"></div>
+
+    <script src="../extension/content.js"></script>
+    <script src="demo.js"></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+.frames/
+*.log
+.DS_Store
+
+# dev3 / local agent scaffolding — not part of the public project
+.dev3/
+.claude/
