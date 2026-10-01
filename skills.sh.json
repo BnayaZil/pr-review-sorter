@@ -1,0 +1,9 @@
+{
+  "groupings": [
+    {
+      "title": "PR Review Sorter",
+      "description": "Turn a GitHub PR into a guided, review-ordered link — changed files sorted for review, with inline highlights and comments that walk the reviewer through the diff. Pairs with the PR Review Sorter Chrome extension.",
+      "skills": ["pr-review-sorter"]
+    }
+  ]
+}
