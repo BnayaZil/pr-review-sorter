@@ -1,14 +1,11 @@
 ---
 name: pr-review-sorter
-description: >-
-  Turn a GitHub PR into a guided, review-ordered link. Use when the user asks to
-  review a pull request, order/sort the changed files, or "where do I start
-  reading". You pick the order files should be read in AND can highlight specific
-  lines with inline comments, then hand back a github.com/.../files URL that the
-  PR Review Sorter Chrome extension reorders and annotates the diff to match.
+description: 'Turn a GitHub PR into a guided, review-ordered link. Use when the user asks to review a pull request, order/sort the changed files, or "where do I start reading". You pick the order files are read in and can highlight specific lines with inline comments, then hand back a github.com/.../files URL that the PR Review Sorter Chrome extension reorders and annotates the diff to match.'
 ---
 
 # PR Review Sorter
+
+![PR Review Sorter — reordering a PR's files with inline highlights and comments](https://raw.githubusercontent.com/BnayaZil/pr-review-sorter/main/assets/demo.gif)
 
 You decide the smartest order to read a PR's changed files, and can highlight key
 lines with your own comments; the extension applies both.
