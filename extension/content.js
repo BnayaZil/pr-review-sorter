@@ -6,19 +6,30 @@
  * "Files changed" list to match, adding a numbered badge per file and a
  * clickable order panel.
  *
- * URL contract (two params, checked in this order):
- *   1. pr_order        base64url( JSON {"v":1,"files":[{"p":"path","r":"reason"}]} )
- *   2. pr_order_paths  comma-separated list of encodeURIComponent(path)
- * Either may live in the query string (?...) or the hash (#...).
+ * URL contract (checked in this order):
+ *   1. pr_order_z     base64url( raw-DEFLATE( JSON ) )  — compressed, for big PRs
+ *   2. pr_order_gist  a GitHub gist id holding the JSON  — remote, unlimited size
+ *   3. pr_order_url   an https URL to the JSON           — remote, unlimited size
+ *   4. pr_order       base64url( JSON )                  — plain inline
+ *   5. pr_order_paths comma-separated encodeURIComponent(path) — simplest
+ * JSON shape: {"v":1,"files":[{"p":"path","r":"reason","notes":[{"l":42,"t":"..."}]}]}
  *
- * The core (parseOrder / collectFiles / decorate / encode) is exposed on
- * window.PRReviewSorter so the demo page can reuse the exact same code.
+ * The payload belongs in the URL HASH (#...) by default: the fragment is never
+ * sent to GitHub's server, so it can't trigger a 414 "URI Too Long" (the query
+ * string is rejected around 7 KB). The query string (?...) is still read, for
+ * short links. Remote params (gist/url) are fetched by the background worker.
+ *
+ * The core (resolveOrder / parseOrder / decorate / encode) is exposed on
+ * window.PRReviewSorter so the demo and tests reuse the exact same code.
  */
 (function () {
   "use strict";
 
   const PARAM = "pr_order";
+  const PARAM_Z = "pr_order_z";
   const PARAM_PATHS = "pr_order_paths";
+  const PARAM_URL = "pr_order_url";
+  const PARAM_GIST = "pr_order_gist";
 
   // ---- base64url <-> unicode string ----
   function b64urlDecode(s) {
@@ -74,24 +85,58 @@
       .filter((n) => n.line != null || n.from != null);
   }
 
-  /** Parse an order from a search string and/or hash. Returns [{path, reason}] or null. */
+  /** Turn a decoded {v, files:[...]} object into [{path, reason, notes}]. */
+  function filesFromData(data) {
+    if (!data || !Array.isArray(data.files)) return null;
+    const out = data.files
+      .map((f) => ({
+        path: f.p != null ? f.p : f.path,
+        reason: f.r != null ? f.r : f.reason || "",
+        notes: normalizeNotes(f.notes || f.n),
+      }))
+      .filter((f) => f.path);
+    return out.length ? out : null;
+  }
+
+  // ---- base64url <-> bytes, and raw-DEFLATE inflate (for pr_order_z) ----
+  function b64urlToBytes(s) {
+    s = s.replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bin = atob(s);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+
+  /** Inflate a raw-DEFLATE base64url token to its UTF-8 string. Async (DecompressionStream). */
+  async function inflateToken(token) {
+    const bytes = b64urlToBytes(token);
+    if (typeof DecompressionStream === "undefined") throw new Error("DecompressionStream unavailable");
+    const ds = new DecompressionStream("deflate-raw");
+    const stream = new Blob([bytes]).stream().pipeThrough(ds);
+    const buf = await new Response(stream).arrayBuffer();
+    return new TextDecoder().decode(buf);
+  }
+
+  /** Compress a UTF-8 string to a raw-DEFLATE base64url token. Async; used by tests/tools. */
+  async function deflateToken(str) {
+    const cs = new CompressionStream("deflate-raw");
+    const stream = new Blob([new TextEncoder().encode(str)]).stream().pipeThrough(cs);
+    const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  /** Parse an INLINE order (plain pr_order / pr_order_paths). Sync. Returns [{...}] or null. */
   function parseOrder(search, hash) {
     const q = new URLSearchParams(search || "");
     const h = new URLSearchParams((hash || "").replace(/^#/, ""));
     const enc = q.get(PARAM) || h.get(PARAM);
     if (enc) {
       try {
-        const data = JSON.parse(b64urlDecode(enc));
-        if (data && Array.isArray(data.files)) {
-          const out = data.files
-            .map((f) => ({
-              path: f.p != null ? f.p : f.path,
-              reason: f.r != null ? f.r : f.reason || "",
-              notes: normalizeNotes(f.notes || f.n),
-            }))
-            .filter((f) => f.path);
-          if (out.length) return out;
-        }
+        const out = filesFromData(JSON.parse(b64urlDecode(enc)));
+        if (out) return out;
       } catch (e) {
         console.warn("[pr-review-sorter] could not parse pr_order:", e);
       }
@@ -105,6 +150,58 @@
       if (out.length) return out;
     }
     return null;
+  }
+
+  /** Ask the background worker to fetch remote JSON (gist id or https url). */
+  function fetchRemote(params) {
+    return new Promise((resolve) => {
+      if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
+        resolve(null);
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage({ type: "prrs-fetch", url: params.url, gist: params.gist }, (resp) => {
+          if (chrome.runtime.lastError) {
+            console.warn("[pr-review-sorter] remote fetch error:", chrome.runtime.lastError.message);
+            resolve(null);
+            return;
+          }
+          resolve(resp && resp.ok ? resp.data : null);
+        });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
+  /**
+   * Resolve an order from a location, handling every carrier in priority order:
+   * compressed (pr_order_z) -> remote (gist/url) -> plain inline. Async.
+   */
+  async function resolveOrder(loc) {
+    const q = new URLSearchParams(loc.search || "");
+    const h = new URLSearchParams((loc.hash || "").replace(/^#/, ""));
+    const get = (k) => q.get(k) || h.get(k);
+
+    const z = get(PARAM_Z);
+    if (z) {
+      try {
+        const out = filesFromData(JSON.parse(await inflateToken(z)));
+        if (out) return out;
+      } catch (e) {
+        console.warn("[pr-review-sorter] could not parse pr_order_z:", e);
+      }
+    }
+
+    const url = get(PARAM_URL);
+    const gist = get(PARAM_GIST);
+    if (url || gist) {
+      const data = await fetchRemote({ url: url, gist: gist });
+      const out = filesFromData(data);
+      if (out) return out;
+    }
+
+    return parseOrder(loc.search, loc.hash);
   }
 
   /** Map every changed-file element in `root` to its path. */
@@ -311,28 +408,59 @@
     return { matched: orderedEls.length, total: map.size };
   }
 
-  const PRReviewSorter = { PARAM, PARAM_PATHS, encode, parseOrder, normalizeNotes, collectFiles, decorate, makeBadge, makePanel, findLine, makeComment, addNote, applyNotes };
+  /** Resolve the order for a location and apply it to `root`. Async. Returns {applied, matched, total}. */
+  async function applyFromLocation(root, loc) {
+    const order = await resolveOrder(loc);
+    if (!order) return { applied: false, matched: 0, total: 0 };
+    const res = decorate(root, order);
+    return { applied: true, matched: res.matched, total: res.total };
+  }
+
+  const PRReviewSorter = {
+    PARAM, PARAM_Z, PARAM_PATHS, PARAM_URL, PARAM_GIST,
+    encode, parseOrder, resolveOrder, filesFromData, normalizeNotes,
+    inflateToken, deflateToken, b64urlToBytes,
+    collectFiles, decorate, makeBadge, makePanel, findLine, makeComment, addNote, applyNotes,
+    applyFromLocation,
+  };
   if (typeof window !== "undefined") window.PRReviewSorter = PRReviewSorter;
 
   // ---- Auto-run on a real GitHub PR "Files changed" page ----
   function isFilesView() {
     return /^\/[^/]+\/[^/]+\/pull\/\d+\/files\b/.test(location.pathname);
   }
+  function urlKey() {
+    return location.pathname + location.search + location.hash;
+  }
 
-  let lastApplied = "";
-  function run() {
+  let resolveKey = null;
+  let resolvedOrder = null;
+  let resolving = false;
+  let appliedKey = null;
+
+  async function run() {
     if (!isFilesView()) return;
-    const order = parseOrder(location.search, location.hash);
-    if (!order) return;
-    const key = location.pathname + location.search + location.hash;
+    const key = urlKey();
+    if (appliedKey === key || resolving) return;
     const map = collectFiles(document);
-    // Re-apply if the URL changed or files finished loading and none are decorated yet.
-    const already = document.querySelector("[data-prrs-order]");
-    if (key === lastApplied && already) return;
-    if (!map.size) return;
-    lastApplied = key;
-    const res = decorate(document, order);
-    console.log("[pr-review-sorter] ordered", res.matched, "of", res.total, "files");
+    if (!map.size) return; // files not in the DOM yet
+    resolving = true;
+    try {
+      if (resolveKey !== key) {
+        resolveKey = key;
+        resolvedOrder = await resolveOrder(location); // remote/compressed resolved once per URL
+      }
+      if (!resolvedOrder) return;
+      if (document.querySelector("[data-prrs-order]")) {
+        appliedKey = key;
+        return;
+      }
+      const res = decorate(document, resolvedOrder);
+      appliedKey = key;
+      console.log("[pr-review-sorter] ordered", res.matched, "of", res.total, "files");
+    } finally {
+      resolving = false;
+    }
   }
 
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {

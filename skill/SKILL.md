@@ -24,11 +24,15 @@ lines with your own comments; the extension applies both.
 
 ## Build the link
 
-Append `?pr_order=<token>` to the PR's **files** URL:
+Put the token in the URL **hash** (`#`), on the PR's **files** URL:
 
 ```
-https://github.com/<owner>/<repo>/pull/<n>/files?pr_order=<token>
+https://github.com/<owner>/<repo>/pull/<n>/files#pr_order=<token>
 ```
+
+Use the hash, **not** `?query`. The hash is never sent to GitHub's server, so it
+can't hit GitHub's ~7 KB "URI too long" limit that a long query string would.
+(`?pr_order=` still works for short links.)
 
 `<token>` is base64url of this JSON (drop `=` padding, `+`→`-`, `/`→`_`):
 
@@ -38,11 +42,12 @@ https://github.com/<owner>/<repo>/pull/<n>/files?pr_order=<token>
 
 - `p` = file path (required), `r` = one-line reason (optional).
 
-Node one-liner:
+Node one-liner (prints the whole link):
 
 ```bash
 node -e 'const f=[{p:"src/index.ts",r:"entry point"},{p:"src/core.ts",r:"main logic"}];
-process.stdout.write(Buffer.from(JSON.stringify({v:1,files:f})).toString("base64url"))'
+const t=Buffer.from(JSON.stringify({v:1,files:f})).toString("base64url");
+console.log("https://github.com/OWNER/REPO/pull/N/files#pr_order="+t)'
 ```
 
 ## Highlight and comment on lines
@@ -67,13 +72,41 @@ Same encoding — just include `notes`:
 
 ```bash
 node -e 'const f=[{p:"src/index.ts",r:"entry point",notes:[{l:42,t:"runs before routes"}]}];
-process.stdout.write(Buffer.from(JSON.stringify({v:1,files:f})).toString("base64url"))'
+const t=Buffer.from(JSON.stringify({v:1,files:f})).toString("base64url");
+console.log("https://github.com/OWNER/REPO/pull/N/files#pr_order="+t)'
 ```
 
-Then: `echo "https://github.com/OWNER/REPO/pull/N/files?pr_order=$TOKEN"`
-
 **No reasons?** Use the simpler param instead — comma-separated, each path URL-encoded:
-`?pr_order_paths=src%2Findex.ts,src%2Fcore.ts`
+`#pr_order_paths=src%2Findex.ts,src%2Fcore.ts`
+
+## Big PRs: compress, or go remote
+
+The hash lifts the limit to ~2 MB (the browser's), which covers almost everything.
+For a very large plan — many files, lots of comments — two options keep the link
+small. Both need nothing extra from the user; the extension handles them.
+
+**Compress it (`#pr_order_z=`)** — same JSON, raw-DEFLATE then base64url. A 200-file
+plan with comments shrinks from ~33 KB to ~1 KB, and the extension inflates it in
+well under a millisecond. Prefer this whenever the plain link feels long:
+
+```bash
+node -e 'const z=require("zlib");const f=[{p:"src/index.ts",r:"entry",notes:[{l:42,t:"runs before routes"}]}];
+const t=z.deflateRawSync(Buffer.from(JSON.stringify({v:1,files:f}))).toString("base64url");
+console.log("https://github.com/OWNER/REPO/pull/N/files#pr_order_z="+t)'
+```
+
+**Store it in a gist (`#pr_order_gist=<id>`)** — unlimited size, and the same link
+works on any machine. Write the plan JSON to a **public** gist (the extension reads
+it unauthenticated), then point at the gist id:
+
+```bash
+printf '%s' '{"v":1,"files":[{"p":"src/index.ts","r":"entry"}]}' > /tmp/plan.json
+ID=$(basename "$(gh gist create /tmp/plan.json --public)")
+echo "https://github.com/OWNER/REPO/pull/N/files#pr_order_gist=$ID"
+```
+
+You can also host the JSON yourself and use `#pr_order_url=<https-url>` (allowed
+hosts: api.github.com, gist.githubusercontent.com, raw.githubusercontent.com).
 
 ## Notes
 
