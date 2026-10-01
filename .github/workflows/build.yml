@@ -1,0 +1,52 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write # needed to publish the release asset
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install
+
+      - name: Install Chromium (for tests)
+        run: npx playwright install --with-deps chromium
+
+      - name: Test (all URL carriers + gist wiring)
+        run: npm test
+
+      - name: Package the extension
+        run: npm run package
+
+      # Publish only on push to main — PRs just build+test.
+      - name: Publish rolling "latest" release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER=$(node -e "console.log(require('./extension/manifest.json').version)")
+          SHA="${GITHUB_SHA::7}"
+          NOTES="Auto-built from \`$SHA\` (manifest v$VER).
+
+          **Download:** \`pr-review-sorter-extension.zip\` below, then unzip and load it
+          at \`chrome://extensions\` → Developer mode → **Load unpacked**.
+
+          Latest-build link (always current):
+          https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/pr-review-sorter-extension.zip"
+          gh release view latest >/dev/null 2>&1 \
+            || gh release create latest --title "Latest build (main)" --notes "$NOTES" --latest
+          gh release edit latest --title "Latest build (main)" --notes "$NOTES" --latest
+          gh release upload latest dist/pr-review-sorter-extension.zip --clobber

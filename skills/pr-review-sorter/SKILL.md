@@ -113,7 +113,8 @@ hosts: api.github.com, gist.githubusercontent.com, raw.githubusercontent.com).
 The link only reorders the diff for someone who has the **PR Review Sorter** Chrome extension.
 
 - Chrome Web Store: _pending review_ — once live, the listing link is at the top of the repo README.
-- Source / unpacked install: https://github.com/BnayaZil/pr-review-sorter#install
+- Latest build (zip): https://github.com/BnayaZil/pr-review-sorter/releases/latest/download/pr-review-sorter-extension.zip — unzip, then Load unpacked.
+- Source / all install options: https://github.com/BnayaZil/pr-review-sorter#install
 
 ## Notes
 

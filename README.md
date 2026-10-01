@@ -1,5 +1,7 @@
 # PR Review Sorter
 
+[![build](https://github.com/BnayaZil/pr-review-sorter/actions/workflows/build.yml/badge.svg)](https://github.com/BnayaZil/pr-review-sorter/actions/workflows/build.yml)
+
 A tiny Chrome extension that lets a **code agent decide the order you read a PR in**.
 
 GitHub shows a PR's changed files alphabetically. That's rarely the order that makes
@@ -23,6 +25,10 @@ The agent needs no API and no server — it just builds a URL.
 ## Install
 
 **Chrome Web Store:** _pending review — the listing link will appear here once it's live._
+
+**Download the latest build** (auto-published by CI on every push to `main`):
+[**pr-review-sorter-extension.zip**](https://github.com/BnayaZil/pr-review-sorter/releases/latest/download/pr-review-sorter-extension.zip)
+→ unzip, then `chrome://extensions` → Developer mode → **Load unpacked** → pick the unzipped folder.
 
 **From source (unpacked):**
 

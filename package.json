@@ -1,0 +1,18 @@
+{
+  "name": "pr-review-sorter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chrome extension that reorders a GitHub PR's files and adds inline highlights/comments from a review plan a code agent encodes in the URL.",
+  "homepage": "https://github.com/BnayaZil/pr-review-sorter",
+  "repository": { "type": "git", "url": "https://github.com/BnayaZil/pr-review-sorter.git" },
+  "license": "MIT",
+  "scripts": {
+    "test": "node test/run-tests.mjs",
+    "package": "node scripts/package.mjs",
+    "gif": "node scripts/build-gif.mjs",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}
