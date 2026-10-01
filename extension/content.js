@@ -209,7 +209,22 @@
     return parseOrder(loc.search, loc.hash);
   }
 
-  /** Map every changed-file element in `root` to its path. */
+  /** The container holding the per-file diffs — classic (#files) or new (/changes). */
+  function filesContainerOf(root) {
+    return root.querySelector("#files") || root.querySelector('[data-testid="progressive-diffs-list"]');
+  }
+
+  /** Resolve a path to its file element: exact (classic) or aria-label suffix (new UI). */
+  function matchFile(map, path) {
+    if (map.has(path)) return map.get(path);
+    for (const entry of map) {
+      const key = entry[0];
+      if (key.endsWith(path) || key.endsWith("/" + path) || key.includes(path)) return entry[1];
+    }
+    return null;
+  }
+
+  /** Map every changed-file element in `root` to its path (classic) or aria-label (new UI). */
   function collectFiles(root) {
     const map = new Map();
     root.querySelectorAll(".file.js-file, div.file[data-tagsearch-path], div.file").forEach((el) => {
@@ -221,6 +236,16 @@
           el.querySelector(".file-info a[title]").getAttribute("title"));
       if (path && !map.has(path)) map.set(path, el);
     });
+    // New "Files changed" experience (/changes): each file is a
+    // <table data-diff-anchor aria-label="…path"> inside a div[class*="diffEntry"].
+    if (!map.size) {
+      root.querySelectorAll("table[data-diff-anchor]").forEach((t) => {
+        const label = t.getAttribute("aria-label");
+        if (!label) return;
+        const unit = t.closest('[class*="diffEntry"]') || t;
+        if (!map.has(label)) map.set(label, unit);
+      });
+    }
     return map;
   }
 
@@ -255,7 +280,8 @@
     order.forEach((item, i) => {
       const li = document.createElement("li");
       li.className = "prrs-panel-item";
-      if (!map.has(item.path)) li.classList.add("prrs-missing");
+      const el = matchFile(map, item.path);
+      if (!el) li.classList.add("prrs-missing");
 
       const num = document.createElement("span");
       num.className = "prrs-panel-num";
@@ -283,7 +309,6 @@
       li.appendChild(num);
       li.appendChild(body);
 
-      const el = map.get(item.path);
       if (el) {
         li.addEventListener("click", () => {
           el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -315,6 +340,17 @@
   function findLine(fileEl, n, side) {
     const demo = fileEl.querySelector('.diff-row[data-line-number="' + n + '"]');
     if (demo) return { row: demo, code: demo };
+    // New UI: <td data-line-anchor="<diffAnchor><R|L><line>"> inside <table data-diff-anchor>.
+    const table = fileEl.matches && fileEl.matches("table[data-diff-anchor]") ? fileEl : fileEl.querySelector("table[data-diff-anchor]");
+    if (table) {
+      const a = table.getAttribute("data-diff-anchor");
+      const at = (s) => table.querySelector('td[data-line-anchor="' + a + s + n + '"]');
+      const cell = at(side === "L" ? "L" : "R") || at(side === "L" ? "R" : "L");
+      if (cell) {
+        const row = cell.closest("tr");
+        return { row: row, code: row };
+      }
+    }
     const cells = Array.prototype.slice.call(fileEl.querySelectorAll('td.blob-num[data-line-number="' + n + '"]'));
     if (!cells.length) return null;
     let cell = cells.find((c) =>
@@ -387,7 +423,7 @@
     const map = collectFiles(root);
     if (!map.size) return { matched: 0, total: 0 };
 
-    const filesContainer = root.querySelector("#files") || map.values().next().value.parentElement;
+    const filesContainer = filesContainerOf(root) || map.values().next().value.parentElement;
     if (!filesContainer) return { matched: 0, total: map.size };
 
     // Remember the native order once, so "Erase" can restore it without a reload.
@@ -399,14 +435,18 @@
     const orderedEls = [];
     const seen = new Set();
     order.forEach((item, i) => {
-      const el = map.get(item.path);
+      const el = matchFile(map, item.path);
       if (!el || seen.has(el)) return;
       seen.add(el);
       orderedEls.push(el);
       el.setAttribute("data-prrs-order", i + 1);
 
-      // Badge in the file header.
-      const header = el.querySelector(".file-header .file-info") || el.querySelector(".file-header") || el;
+      // Badge in the file header (classic .file-header, or the new-UI diff region).
+      const header =
+        el.querySelector(".file-header .file-info") ||
+        el.querySelector(".file-header") ||
+        el.querySelector('[role="region"]') ||
+        el;
       if (header && !header.querySelector(".prrs-badge")) {
         header.insertBefore(makeBadge(i + 1, item.reason), header.firstChild);
       }
@@ -516,7 +556,7 @@
     root.querySelectorAll("[data-prrs-order]").forEach((n) => n.removeAttribute("data-prrs-order"));
     const panel = document.getElementById("prrs-panel");
     if (panel) panel.remove();
-    const c = root.querySelector("#files");
+    const c = filesContainerOf(root);
     if (c && c.__prrsOriginal) {
       c.__prrsOriginal.forEach((el) => {
         if (el && el.parentElement === c) c.appendChild(el);
@@ -530,12 +570,13 @@
     inflateToken, deflateToken, b64urlToBytes,
     collectFiles, decorate, makeBadge, makePanel, findLine, makeComment, addNote, applyNotes,
     applyFromLocation, prId, chooseOrder, eraseDecorations, storeGet, storeSet, storeRemove,
+    matchFile, filesContainerOf,
   };
   if (typeof window !== "undefined") window.PRReviewSorter = PRReviewSorter;
 
   // ---- Auto-run on GitHub PR pages ----
   function isFilesView() {
-    return /^\/[^/]+\/[^/]+\/pull\/\d+\/files\b/.test(location.pathname);
+    return /^\/[^/]+\/[^/]+\/pull\/\d+\/(files|changes)\b/.test(location.pathname);
   }
   function alreadyApplied() {
     return !!document.querySelector("[data-prrs-order]");

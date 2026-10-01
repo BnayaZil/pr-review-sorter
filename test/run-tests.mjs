@@ -15,6 +15,7 @@ import zlib from "zlib";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixture = "file://" + path.join(root, "test", "fixture.html");
+const fixtureNew = "file://" + path.join(root, "test", "fixture-new.html");
 
 let pass = 0,
   fail = 0;
@@ -164,6 +165,36 @@ const stored = await page.evaluate(async () => {
   return g["prrs:order:o/r/1"];
 });
 check("storeSet/storeGet round-trips", !!stored && stored.files && stored.files[0].path === "a", JSON.stringify(stored));
+
+console.log("\n[browser] NEW GitHub UI (/changes) — reorder + badge + highlight + comment");
+const newOrder = [
+  { path: "packages/app/alpha.ts", reason: "entry", notes: [{ line: 2, text: "the main fn" }] },
+  { path: "packages/app/mid.ts", reason: "mid" },
+  { path: "packages/app/zeta.ts", reason: "leaf" },
+];
+await page.goto(fixtureNew + "#pr_order=" + core.encode(newOrder));
+await page.waitForFunction("window.PRReviewSorter !== undefined");
+const nu = await page.evaluate(async () => {
+  const res = await window.PRReviewSorter.applyFromLocation(document, location);
+  const order = Array.prototype.slice
+    .call(document.querySelectorAll('[data-testid="progressive-diffs-list"] > div'))
+    .map((d) => { const t = d.querySelector("table[data-diff-anchor]"); return t ? t.getAttribute("aria-label") : null; })
+    .filter(Boolean);
+  return {
+    res,
+    order,
+    badges: document.querySelectorAll(".prrs-badge").length,
+    comments: document.querySelectorAll(".prrs-comment").length,
+    highlights: document.querySelectorAll(".prrs-hl").length,
+    panel: !!document.getElementById("prrs-panel"),
+  };
+});
+check("new UI: applied, matched 3", nu.res.applied && nu.res.matched === 3, JSON.stringify(nu.res));
+check("new UI: reordered to alpha, mid, zeta", nu.order.length === 3 && nu.order[0].endsWith("alpha.ts") && nu.order[1].endsWith("mid.ts") && nu.order[2].endsWith("zeta.ts"), nu.order.join(" | "));
+check("new UI: 3 badges", nu.badges === 3, "badges=" + nu.badges);
+check("new UI: 1 inline comment", nu.comments === 1, "comments=" + nu.comments);
+check("new UI: line highlighted", nu.highlights >= 1, "hl=" + nu.highlights);
+check("new UI: order panel present", nu.panel);
 
 await browser.close();
 

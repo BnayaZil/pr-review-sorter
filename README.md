@@ -29,6 +29,12 @@ to appear on the link **once, on any of the PR's pages** — after that, the Fil
 sorted even when you reach it by a plain URL with no params. The order panel has an **Erase**
 button that clears the cache for that PR and restores GitHub's native order.
 
+## Compatibility
+
+Works on both GitHub Files-changed experiences: the classic `/files` page and the new
+(default since Jan 2026) `/changes` React page — reorder, badges, panel, highlights, and
+inline comments all apply on either.
+
 ## Install
 
 **Chrome Web Store:** _pending review — the listing link will appear here once it's live._

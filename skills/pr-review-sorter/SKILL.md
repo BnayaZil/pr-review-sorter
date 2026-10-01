@@ -119,4 +119,5 @@ The link only reorders the diff for someone who has the **PR Review Sorter** Chr
 - Files you leave out still show — they're kept after the ordered ones.
 - The extension caches the order per PR, so the params can be on **any** of the PR's URLs (conversation, files, a comment link); the Files tab stays sorted afterward. You don't have to link the `/files` URL specifically.
 - The reviewer can click **Erase** in the order panel to clear it and restore GitHub's order.
+- Works on both the classic `/files` page and GitHub's new `/changes` "Files changed" experience. You can link either; the extension handles the redirect and caches by PR.
 - The reviewer needs the extension installed (see above) for the link to reorder the diff.

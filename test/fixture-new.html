@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>PR Review Sorter — new-UI test fixture</title>
+    <link rel="stylesheet" href="../extension/styles.css" />
+    <style>
+      body { font: 13px -apple-system, sans-serif; margin: 16px; }
+      .diffEntry { border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 10px; }
+      .hdr { background: #f6f8fa; padding: 6px 10px; }
+      table.tab-size { width: 100%; border-collapse: collapse; font-family: monospace; }
+      td { padding: 0 6px; }
+      .ln { color: #888; width: 30px; }
+    </style>
+  </head>
+  <body>
+    <!-- Mirrors GitHub's new "Files changed" (/changes) DOM: a progressive-diffs-list
+         of div[class*=diffEntry] > [role=region] > table[data-diff-anchor aria-label],
+         with line cells td[data-line-anchor="<anchor><R|L><n>"]. Order: zeta, alpha, mid. -->
+    <div data-testid="progressive-diffs-list">
+      <div class="PullRequestDiffsList-module__diffEntry__x">
+        <div role="region">
+          <div class="hdr">packages/app/zeta.ts</div>
+          <table class="tab-size" data-diff-anchor="diff-ZETA" aria-label="Diff for packages/app/zeta.ts">
+            <tbody>
+              <tr><td class="ln">1</td><td class="ln" data-line-anchor="diff-ZETAR1">1</td><td class="code">export const z = 1</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="PullRequestDiffsList-module__diffEntry__x">
+        <div role="region">
+          <div class="hdr">packages/app/alpha.ts</div>
+          <table class="tab-size" data-diff-anchor="diff-ALPHA" aria-label="Diff for packages/app/alpha.ts">
+            <tbody>
+              <tr><td class="ln">1</td><td class="ln" data-line-anchor="diff-ALPHAR1">1</td><td class="code">import './zeta'</td></tr>
+              <tr><td class="ln">2</td><td class="ln" data-line-anchor="diff-ALPHAR2">2</td><td class="code">export function main() {}</td></tr>
+              <tr><td class="ln">3</td><td class="ln" data-line-anchor="diff-ALPHAR3">3</td><td class="code">  return main()</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="PullRequestDiffsList-module__diffEntry__x">
+        <div role="region">
+          <div class="hdr">packages/app/mid.ts</div>
+          <table class="tab-size" data-diff-anchor="diff-MID" aria-label="Diff for packages/app/mid.ts">
+            <tbody>
+              <tr><td class="ln">1</td><td class="ln" data-line-anchor="diff-MIDR1">1</td><td class="code">export const m = 3</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script src="../extension/content.js"></script>
+  </body>
+</html>
