@@ -1,4 +1,57 @@
-/* PR Review Sorter — badges + order panel. Works over GitHub light and dark. */
+/*
+ * PR Review Sorter — badges, order panel, highlights, comments.
+ *
+ * Theme: GitHub's theme is set via <html data-color-mode="light|dark|auto">,
+ * independent of the OS. Keying off prefers-color-scheme alone breaks on a dark
+ * GitHub with a light OS (bright highlight, white comment box). So these tokens
+ * follow GitHub's attribute first, and fall back to the OS only for color-mode="auto".
+ * The line highlight is a translucent amber so it reads on any background.
+ */
+:root {
+  --prrs-surface: #ffffff;
+  --prrs-surface-subtle: #f6f8fa;
+  --prrs-border: #d0d7de;
+  --prrs-fg: #1f2328;
+  --prrs-fg-muted: #656d76;
+  --prrs-accent: #8250df;
+  --prrs-blue: #0969da;
+  --prrs-hl-bg: rgba(240, 180, 0, 0.18);
+  --prrs-hl-bar: #d4a72c;
+  --prrs-danger-bg: #ffebe9;
+  --prrs-danger-fg: #cf222e;
+}
+
+/* GitHub explicitly in dark mode (the common case the old CSS got wrong). */
+:root[data-color-mode="dark"] {
+  --prrs-surface: #161b22;
+  --prrs-surface-subtle: #0d1117;
+  --prrs-border: #30363d;
+  --prrs-fg: #e6edf3;
+  --prrs-fg-muted: #8b949e;
+  --prrs-accent: #a371f7;
+  --prrs-blue: #2f81f7;
+  --prrs-hl-bg: rgba(240, 180, 0, 0.14);
+  --prrs-hl-bar: #ae7c14;
+  --prrs-danger-bg: #3c1618;
+  --prrs-danger-fg: #ff7b72;
+}
+
+/* GitHub following the OS (color-mode="auto" or unset) and the OS is dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-color-mode="light"]) {
+    --prrs-surface: #161b22;
+    --prrs-surface-subtle: #0d1117;
+    --prrs-border: #30363d;
+    --prrs-fg: #e6edf3;
+    --prrs-fg-muted: #8b949e;
+    --prrs-accent: #a371f7;
+    --prrs-blue: #2f81f7;
+    --prrs-hl-bg: rgba(240, 180, 0, 0.14);
+    --prrs-hl-bar: #ae7c14;
+    --prrs-danger-bg: #3c1618;
+    --prrs-danger-fg: #ff7b72;
+  }
+}
 
 .prrs-badge {
   display: inline-flex;
@@ -9,7 +62,7 @@
   padding: 0 6px;
   margin-right: 8px;
   border-radius: 999px;
-  background: #0969da;
+  background: var(--prrs-blue);
   color: #fff;
   font-size: 12px;
   font-weight: 600;
@@ -19,7 +72,7 @@
 }
 
 .file.prrs-flash {
-  outline: 2px solid #0969da;
+  outline: 2px solid var(--prrs-blue);
   outline-offset: 2px;
   transition: outline-color 0.2s ease;
 }
@@ -34,9 +87,9 @@
   max-height: calc(100vh - 140px);
   display: flex;
   flex-direction: column;
-  background: var(--color-canvas-overlay, #fff);
-  color: var(--color-fg-default, #1f2328);
-  border: 1px solid var(--color-border-default, #d0d7de);
+  background: var(--prrs-surface);
+  color: var(--prrs-fg);
+  border: 1px solid var(--prrs-border);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(31, 35, 40, 0.2);
   font-size: 12px;
@@ -48,8 +101,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--color-canvas-subtle, #f6f8fa);
-  border-bottom: 1px solid var(--color-border-default, #d0d7de);
+  background: var(--prrs-surface-subtle);
+  border-bottom: 1px solid var(--prrs-border);
 }
 
 .prrs-panel-title {
@@ -74,9 +127,9 @@
 }
 
 .prrs-erase {
-  border: 1px solid var(--color-border-default, #d0d7de);
+  border: 1px solid var(--prrs-border);
   background: transparent;
-  color: var(--color-fg-muted, #656d76);
+  color: var(--prrs-fg-muted);
   font: 600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding: 2px 8px;
   border-radius: 6px;
@@ -84,17 +137,9 @@
 }
 
 .prrs-erase:hover {
-  background: #ffebe9;
-  color: #cf222e;
-  border-color: #cf222e;
-}
-
-@media (prefers-color-scheme: dark) {
-  .prrs-erase:hover {
-    background: #3c1618;
-    color: #ff7b72;
-    border-color: #ff7b72;
-  }
+  background: var(--prrs-danger-bg);
+  color: var(--prrs-danger-fg);
+  border-color: var(--prrs-danger-fg);
 }
 
 .prrs-panel-list {
@@ -118,7 +163,7 @@
 }
 
 .prrs-panel-item:hover {
-  background: var(--color-canvas-subtle, #f6f8fa);
+  background: var(--prrs-surface-subtle);
 }
 
 .prrs-panel-num {
@@ -129,7 +174,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #0969da;
+  background: var(--prrs-blue);
   color: #fff;
   font-weight: 600;
   font-size: 11px;
@@ -147,29 +192,39 @@
 }
 
 .prrs-panel-reason {
-  color: var(--color-fg-muted, #656d76);
+  color: var(--prrs-fg-muted);
   margin-top: 2px;
 }
 
 .prrs-panel-count {
   margin-top: 3px;
   font-size: 11px;
-  color: #8250df;
+  color: var(--prrs-accent);
   font-weight: 600;
 }
 
-/* ---- Inline highlight + agent comment ---- */
-.prrs-hl {
-  background: #fff8c5 !important;
-  box-shadow: inset 3px 0 0 #d4a72c;
+.prrs-panel-item.prrs-missing {
+  opacity: 0.5;
+  cursor: default;
 }
+
+.prrs-panel-item.prrs-missing .prrs-panel-num {
+  background: var(--prrs-fg-muted);
+}
+
+/* ---- Inline highlight + agent comment ---- */
+/* Translucent amber tints whatever is behind it, so it never washes out the code. */
+.prrs-hl,
 .prrs-hl td {
-  background: #fff8c5 !important;
+  background: var(--prrs-hl-bg) !important;
+}
+.prrs-hl {
+  box-shadow: inset 3px 0 0 var(--prrs-hl-bar);
 }
 
 .prrs-comment-cell {
   padding: 0 !important;
-  background: var(--color-canvas-subtle, #f6f8fa);
+  background: var(--prrs-surface-subtle);
 }
 
 .prrs-comment-row .prrs-comment,
@@ -183,18 +238,18 @@
   align-items: flex-start;
   margin: 6px 0;
   padding: 10px 12px;
-  border: 1px solid var(--color-border-default, #d0d7de);
-  border-left: 3px solid #8250df;
+  border: 1px solid var(--prrs-border);
+  border-left: 3px solid var(--prrs-accent);
   border-radius: 6px;
-  background: var(--color-canvas-default, #fff);
+  background: var(--prrs-surface);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--color-fg-default, #1f2328);
+  color: var(--prrs-fg);
 }
 
 .prrs-comment-icon {
-  color: #8250df;
+  color: var(--prrs-accent);
   font-size: 14px;
   line-height: 1.4;
   flex: 0 0 auto;
@@ -208,49 +263,11 @@
 
 .prrs-comment-author {
   font-weight: 600;
-  color: #8250df;
+  color: var(--prrs-accent);
   font-size: 12px;
   margin-bottom: 2px;
 }
 
 .prrs-comment-text {
   white-space: normal;
-}
-
-@media (prefers-color-scheme: dark) {
-  .prrs-hl,
-  .prrs-hl td {
-    background: #2d2503 !important;
-  }
-  .prrs-comment {
-    background: #161b22;
-    border-color: #30363d;
-    border-left-color: #a371f7;
-    color: #e6edf3;
-  }
-  .prrs-comment-icon,
-  .prrs-comment-author { color: #a371f7; }
-  .prrs-comment-cell { background: #0d1117; }
-  .prrs-panel-count { color: #a371f7; }
-}
-
-.prrs-panel-item.prrs-missing {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.prrs-panel-item.prrs-missing .prrs-panel-num {
-  background: var(--color-fg-muted, #9198a1);
-}
-
-@media (prefers-color-scheme: dark) {
-  #prrs-panel {
-    background: #161b22;
-    color: #e6edf3;
-    border-color: #30363d;
-  }
-  .prrs-panel-head {
-    background: #0d1117;
-    border-color: #30363d;
-  }
 }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PR Review Sorter",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Reorders a GitHub PR's changed files and highlights/comments lines, from a review plan a code agent encodes in the URL.",
   "homepage_url": "https://github.com/BnayaZil/pr-review-sorter",
   "icons": {
