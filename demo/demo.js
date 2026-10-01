@@ -202,6 +202,12 @@
   seek(0);
   window.demoReady = true;
 
+  // Make the panel's Erase button work in the standalone demo too.
+  document.addEventListener("prrs:erase", () => {
+    window.PRReviewSorter.eraseDecorations(document);
+    seek(0);
+  });
+
   // Autoplay when opened directly in a browser (skip with ?static=1 for the recorder).
   if (!/[?&]static/.test(location.search)) {
     const play = () => {

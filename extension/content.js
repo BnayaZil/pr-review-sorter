@@ -19,6 +19,11 @@
  * string is rejected around 7 KB). The query string (?...) is still read, for
  * short links. Remote params (gist/url) are fetched by the background worker.
  *
+ * Caching: when an order is seen on ANY of a PR's pages (conversation, files, …),
+ * it's cached per PR (owner/repo/number) in chrome.storage.local and re-applied on
+ * the files view even when that URL has no params. The order panel has an "Erase"
+ * button that clears the cache for the PR and restores GitHub's native order.
+ *
  * The core (resolveOrder / parseOrder / decorate / encode) is exposed on
  * window.PRReviewSorter so the demo and tests reuse the exact same code.
  */
@@ -238,7 +243,10 @@
     head.className = "prrs-panel-head";
     head.innerHTML =
       '<span class="prrs-panel-title">Review order</span>' +
-      '<button class="prrs-panel-toggle" title="Collapse">–</button>';
+      '<span class="prrs-panel-actions">' +
+      '<button class="prrs-erase" title="Erase sorting and restore GitHub\'s order">Erase</button>' +
+      '<button class="prrs-panel-toggle" title="Collapse">–</button>' +
+      "</span>";
     panel.appendChild(head);
 
     const list = document.createElement("ol");
@@ -291,6 +299,13 @@
       e.stopPropagation();
       panel.classList.toggle("prrs-collapsed");
     });
+    const eraseBtn = head.querySelector(".prrs-erase");
+    if (eraseBtn) {
+      eraseBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.dispatchEvent(new CustomEvent("prrs:erase"));
+      });
+    }
     return panel;
   }
 
@@ -375,6 +390,11 @@
     const filesContainer = root.querySelector("#files") || map.values().next().value.parentElement;
     if (!filesContainer) return { matched: 0, total: map.size };
 
+    // Remember the native order once, so "Erase" can restore it without a reload.
+    if (!filesContainer.__prrsOriginal) {
+      filesContainer.__prrsOriginal = Array.prototype.slice.call(filesContainer.children);
+    }
+
     // Desired sequence: ordered matches first, then anything the agent left out.
     const orderedEls = [];
     const seen = new Set();
@@ -416,54 +436,181 @@
     return { applied: true, matched: res.matched, total: res.total };
   }
 
+  // ---- Per-PR cache (so params on any of a PR's URLs apply on the files view) ----
+
+  /** owner/repo/number for the current PR, or null. */
+  function prId(pathname) {
+    const m = (pathname || "").match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    return m ? m[1] + "/" + m[2] + "/" + m[3] : null;
+  }
+  const KEY_ORDER = (id) => "prrs:order:" + id;
+  const KEY_DISMISS = (id) => "prrs:dismissed:" + id;
+
+  function hasChromeStorage() {
+    return typeof chrome !== "undefined" && chrome.storage && chrome.storage.local;
+  }
+  function storeGet(keys) {
+    return new Promise((resolve) => {
+      try {
+        if (hasChromeStorage()) {
+          chrome.storage.local.get(keys, (r) => resolve(r || {}));
+          return;
+        }
+      } catch (e) {}
+      // Fallback: localStorage (demo/tests / no storage permission).
+      const out = {};
+      (Array.isArray(keys) ? keys : [keys]).forEach((k) => {
+        try {
+          const v = localStorage.getItem(k);
+          if (v != null) out[k] = JSON.parse(v);
+        } catch (e) {}
+      });
+      resolve(out);
+    });
+  }
+  function storeSet(obj) {
+    return new Promise((resolve) => {
+      try {
+        if (hasChromeStorage()) {
+          chrome.storage.local.set(obj, () => resolve());
+          return;
+        }
+      } catch (e) {}
+      Object.keys(obj).forEach((k) => {
+        try {
+          localStorage.setItem(k, JSON.stringify(obj[k]));
+        } catch (e) {}
+      });
+      resolve();
+    });
+  }
+  function storeRemove(keys) {
+    return new Promise((resolve) => {
+      try {
+        if (hasChromeStorage()) {
+          chrome.storage.local.remove(keys, () => resolve());
+          return;
+        }
+      } catch (e) {}
+      (Array.isArray(keys) ? keys : [keys]).forEach((k) => {
+        try {
+          localStorage.removeItem(k);
+        } catch (e) {}
+      });
+      resolve();
+    });
+  }
+
+  /** Decide which order to apply. Explicit params win; otherwise cache, unless erased. */
+  function chooseOrder(paramsOrder, cachedOrder, dismissed) {
+    if (paramsOrder && paramsOrder.length) return paramsOrder;
+    if (dismissed) return null;
+    return cachedOrder && cachedOrder.length ? cachedOrder : null;
+  }
+
+  /** Remove all of our decorations and restore GitHub's native file order. */
+  function eraseDecorations(root) {
+    root.querySelectorAll(".prrs-comment-row").forEach((n) => n.remove());
+    root.querySelectorAll(".prrs-badge").forEach((n) => n.remove());
+    root.querySelectorAll(".prrs-hl").forEach((n) => n.classList.remove("prrs-hl"));
+    root.querySelectorAll("[data-prrs-order]").forEach((n) => n.removeAttribute("data-prrs-order"));
+    const panel = document.getElementById("prrs-panel");
+    if (panel) panel.remove();
+    const c = root.querySelector("#files");
+    if (c && c.__prrsOriginal) {
+      c.__prrsOriginal.forEach((el) => {
+        if (el && el.parentElement === c) c.appendChild(el);
+      });
+    }
+  }
+
   const PRReviewSorter = {
     PARAM, PARAM_Z, PARAM_PATHS, PARAM_URL, PARAM_GIST,
     encode, parseOrder, resolveOrder, filesFromData, normalizeNotes,
     inflateToken, deflateToken, b64urlToBytes,
     collectFiles, decorate, makeBadge, makePanel, findLine, makeComment, addNote, applyNotes,
-    applyFromLocation,
+    applyFromLocation, prId, chooseOrder, eraseDecorations, storeGet, storeSet, storeRemove,
   };
   if (typeof window !== "undefined") window.PRReviewSorter = PRReviewSorter;
 
-  // ---- Auto-run on a real GitHub PR "Files changed" page ----
+  // ---- Auto-run on GitHub PR pages ----
   function isFilesView() {
     return /^\/[^/]+\/[^/]+\/pull\/\d+\/files\b/.test(location.pathname);
   }
-  function urlKey() {
-    return location.pathname + location.search + location.hash;
+  function alreadyApplied() {
+    return !!document.querySelector("[data-prrs-order]");
   }
 
-  let resolveKey = null;
-  let resolvedOrder = null;
-  let resolving = false;
-  let appliedKey = null;
+  let busy = false;
+  let capturedUrlKey = null;
+  // Resolve params once per URL so remote fetches don't repeat on every mutation.
+  let resolvedUrlKey = null;
+  let resolvedParamsOrder = null;
+  async function paramsOrderFor(loc) {
+    const key = (loc.search || "") + (loc.hash || "");
+    if (key === resolvedUrlKey) return resolvedParamsOrder;
+    resolvedUrlKey = key;
+    resolvedParamsOrder = await resolveOrder(loc);
+    return resolvedParamsOrder;
+  }
+
+  function stripParamsFromUrl() {
+    try {
+      const u = new URL(location.href);
+      const names = [PARAM, PARAM_Z, PARAM_PATHS, PARAM_URL, PARAM_GIST];
+      names.forEach((k) => u.searchParams.delete(k));
+      const h = (u.hash || "").replace(/^#/, "");
+      if (h) {
+        const hp = new URLSearchParams(h);
+        names.forEach((k) => hp.delete(k));
+        const hs = hp.toString();
+        u.hash = hs ? "#" + hs : "";
+      }
+      history.replaceState(null, "", u.toString());
+    } catch (e) {}
+  }
+
+  async function erase() {
+    const id = prId(location.pathname);
+    eraseDecorations(document);
+    if (id) {
+      await storeSet({ [KEY_DISMISS(id)]: true });
+      await storeRemove([KEY_ORDER(id)]);
+    }
+    stripParamsFromUrl();
+    resolvedUrlKey = null;
+    resolvedParamsOrder = null;
+    capturedUrlKey = null;
+  }
 
   async function run() {
-    if (!isFilesView()) return;
-    const key = urlKey();
-    if (appliedKey === key || resolving) return;
-    const map = collectFiles(document);
-    if (!map.size) return; // files not in the DOM yet
-    resolving = true;
+    if (busy) return;
+    const id = prId(location.pathname);
+    if (!id) return;
+    busy = true;
     try {
-      if (resolveKey !== key) {
-        resolveKey = key;
-        resolvedOrder = await resolveOrder(location); // remote/compressed resolved once per URL
+      const paramsOrder = await paramsOrderFor(location);
+      // An explicit order on ANY of this PR's pages → cache it and clear any prior erase.
+      if (paramsOrder && capturedUrlKey !== resolvedUrlKey) {
+        capturedUrlKey = resolvedUrlKey;
+        await storeSet({ [KEY_ORDER(id)]: { files: paramsOrder, ts: Date.now() }, [KEY_DISMISS(id)]: false });
       }
-      if (!resolvedOrder) return;
-      if (document.querySelector("[data-prrs-order]")) {
-        appliedKey = key;
-        return;
-      }
-      const res = decorate(document, resolvedOrder);
-      appliedKey = key;
-      console.log("[pr-review-sorter] ordered", res.matched, "of", res.total, "files");
+      if (!isFilesView()) return; // only the files view has a diff to decorate
+      if (alreadyApplied()) return;
+      if (!collectFiles(document).size) return; // files not in the DOM yet
+      const st = await storeGet([KEY_ORDER(id), KEY_DISMISS(id)]);
+      const cached = st[KEY_ORDER(id)] && st[KEY_ORDER(id)].files;
+      const order = chooseOrder(paramsOrder, cached, !!st[KEY_DISMISS(id)]);
+      if (!order) return;
+      const res = decorate(document, order);
+      console.log("[pr-review-sorter] ordered", res.matched, "of", res.total, "files", paramsOrder ? "(from URL)" : "(from cache)");
     } finally {
-      resolving = false;
+      busy = false;
     }
   }
 
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
+    document.addEventListener("prrs:erase", erase);
     // GitHub loads diffs progressively and navigates via Turbo; watch for both.
     const obs = new MutationObserver(() => run());
     obs.observe(document.documentElement, { childList: true, subtree: true });

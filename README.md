@@ -17,10 +17,17 @@ through the diff — all encoded in the same link, no API and no server.
 ## How it works
 
 1. A code agent (Claude, etc.) looks at a PR and picks a sensible reading order, a short reason per file, and — optionally — highlights key lines with inline comments.
-2. It encodes all of that into the PR's files URL — in the `#hash` by default.
+2. It encodes all of that into one of the PR's URLs — in the `#hash` by default (the conversation tab, the files tab, a comment link — any of them).
 3. You open the link. The extension reorders the diff, numbers each file, shows the order panel, and draws the highlights + comments inline.
 
 The agent needs no API and no server — it just builds a URL.
+
+## Caching & erase
+
+The order is **cached per PR** (owner/repo/number) in the browser. So the params only need
+to appear on the link **once, on any of the PR's pages** — after that, the Files tab stays
+sorted even when you reach it by a plain URL with no params. The order panel has an **Erase**
+button that clears the cache for that PR and restores GitHub's native order.
 
 ## Install
 

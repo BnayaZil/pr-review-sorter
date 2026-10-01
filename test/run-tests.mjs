@@ -127,6 +127,44 @@ const perf = await page.evaluate(
 console.log(`    200 files+notes: raw JSON ${perf.rawLen}B -> z-token ${perf.zLen}B; inflate+parse avg ${perf.ms.toFixed(2)} ms`);
 check("inflate+parse under 5 ms for a 200-file plan", perf.ms < 5, perf.ms.toFixed(2) + " ms");
 
+console.log("\n[browser] erase restores native order + clears decorations");
+await applyAt(page, "#pr_order=" + plainToken);
+const afterErase = await page.evaluate(() => {
+  window.PRReviewSorter.eraseDecorations(document);
+  return {
+    order: Array.prototype.slice.call(document.querySelectorAll("#files > .file")).map((f) => f.getAttribute("data-tagsearch-path")),
+    badges: document.querySelectorAll(".prrs-badge").length,
+    comments: document.querySelectorAll(".prrs-comment").length,
+    panel: !!document.getElementById("prrs-panel"),
+    hls: document.querySelectorAll(".prrs-hl").length,
+  };
+});
+check("erase clears badges/comments/panel/highlights", afterErase.badges === 0 && afterErase.comments === 0 && !afterErase.panel && afterErase.hls === 0, JSON.stringify(afterErase));
+check("erase restores native order", JSON.stringify(afterErase.order) === JSON.stringify(["src/zeta.ts", "src/alpha.ts", "src/mid.ts"]), afterErase.order.join(","));
+
+console.log("\n[browser] Erase button fires prrs:erase");
+const fired = await page.evaluate(async () => {
+  await window.PRReviewSorter.applyFromLocation(document, location);
+  return await new Promise((resolve) => {
+    let got = false;
+    document.addEventListener("prrs:erase", () => { got = true; }, { once: true });
+    const btn = document.querySelector(".prrs-erase");
+    if (!btn) return resolve(false);
+    btn.click();
+    setTimeout(() => resolve(got), 300);
+  });
+});
+check("clicking Erase dispatches prrs:erase", fired === true);
+
+console.log("\n[browser] storage round-trip (localStorage fallback)");
+const stored = await page.evaluate(async () => {
+  const S = window.PRReviewSorter;
+  await S.storeSet({ "prrs:order:o/r/1": { files: [{ path: "a" }] } });
+  const g = await S.storeGet(["prrs:order:o/r/1"]);
+  return g["prrs:order:o/r/1"];
+});
+check("storeSet/storeGet round-trips", !!stored && stored.files && stored.files[0].path === "a", JSON.stringify(stored));
+
 await browser.close();
 
 console.log("\n[node] remote (gist) wiring in resolveOrder");
@@ -143,6 +181,15 @@ const core2 = loadCore({ chrome: mockChrome });
 const gistOrder = await core2.resolveOrder({ search: "", hash: "#pr_order_gist=abc123" });
 check("gist id forwarded to background", sentMsg && sentMsg.gist === "abc123", JSON.stringify(sentMsg));
 check("remote JSON parsed into an order", !!gistOrder && gistOrder[0].path === "src/alpha.ts" && gistOrder[0].notes.length === 1);
+
+console.log("\n[node] prId + chooseOrder (cache decision)");
+check("prId parses a PR path", core.prId("/o/r/pull/42/files") === "o/r/42", String(core.prId("/o/r/pull/42/files")));
+check("prId is null off a PR", core.prId("/o/r/tree/main") === null);
+const P = [{ path: "x" }], C = [{ path: "y" }];
+check("params win over cache", core.chooseOrder(P, C, false) === P);
+check("cache used when no params", core.chooseOrder(null, C, false) === C);
+check("erased + no params => nothing", core.chooseOrder(null, C, true) === null);
+check("erased but params present => params", core.chooseOrder(P, C, true) === P);
 
 console.log(`\n${fail === 0 ? "ALL PASS" : "FAILURES"}: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
