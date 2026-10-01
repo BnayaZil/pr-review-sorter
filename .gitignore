@@ -6,3 +6,4 @@ node_modules/
 # dev3 / local agent scaffolding — not part of the public project
 .dev3/
 .claude/
+dist/

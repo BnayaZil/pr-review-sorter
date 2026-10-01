@@ -108,8 +108,15 @@ echo "https://github.com/OWNER/REPO/pull/N/files#pr_order_gist=$ID"
 You can also host the JSON yourself and use `#pr_order_url=<https-url>` (allowed
 hosts: api.github.com, gist.githubusercontent.com, raw.githubusercontent.com).
 
+## Get the extension
+
+The link only reorders the diff for someone who has the **PR Review Sorter** Chrome extension.
+
+- Chrome Web Store: _pending review_ — once live, the listing link is at the top of the repo README.
+- Source / unpacked install: https://github.com/BnayaZil/pr-review-sorter#install
+
 ## Notes
 
 - Only paths that actually changed in the PR are matched; extras are ignored, missing ones are greyed out in the panel.
 - Files you leave out still show — they're kept after the ordered ones.
-- The user needs the extension installed (repo README) for the link to reorder the diff.
+- The reviewer needs the extension installed (see above) for the link to reorder the diff.

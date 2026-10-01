@@ -3,6 +3,7 @@
   "name": "PR Review Sorter",
   "version": "1.0.0",
   "description": "Reorders a GitHub PR's changed files and highlights/comments lines, from a review plan a code agent encodes in the URL.",
+  "homepage_url": "https://github.com/BnayaZil/pr-review-sorter",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

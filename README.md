@@ -20,12 +20,19 @@ through the diff — all encoded in the same link, no API and no server.
 
 The agent needs no API and no server — it just builds a URL.
 
-## Install (unpacked)
+## Install
+
+**Chrome Web Store:** _pending review — the listing link will appear here once it's live._
+
+**From source (unpacked):**
 
 1. `git clone https://github.com/BnayaZil/pr-review-sorter.git`
 2. Open `chrome://extensions`, turn on **Developer mode**.
 3. **Load unpacked** → select the `extension/` folder.
 4. Open any `…/pull/<n>/files#pr_order=…` link.
+
+> **Pairs with an agent skill** — [`skills/pr-review-sorter`](skills/pr-review-sorter/SKILL.md) teaches a
+> code agent to generate these links. Install it with `npx skills add BnayaZil/pr-review-sorter` (see below).
 
 ## The URL contract
 
@@ -86,10 +93,19 @@ Give any file a `notes` array to highlight lines and attach the agent's comments
 
 ## The agent skill
 
-[`skill/SKILL.md`](skill/SKILL.md) is a short [Agent Skill](https://docs.claude.com/en/docs/claude-code/skills)
-that teaches an agent the whole flow: list files, order them for a human, build the link.
-To use it with Claude Code, drop the folder into `~/.claude/skills/pr-review-sorter/`
-(or your project's `.claude/skills/`). Then: *"review PR 128 and give me a sorted link."*
+[`skills/pr-review-sorter/SKILL.md`](skills/pr-review-sorter/SKILL.md) is a short
+[Agent Skill](https://docs.claude.com/en/docs/claude-code/skills) that teaches an agent the whole
+flow: list files, order them for a human, highlight lines, build the link.
+
+Install it with the [skills.sh](https://skills.sh) CLI:
+
+```bash
+npx skills add BnayaZil/pr-review-sorter          # into ./.claude/skills (this project)
+npx skills add BnayaZil/pr-review-sorter -g       # or globally, for every project
+```
+
+Or copy `skills/pr-review-sorter/` into `~/.claude/skills/` by hand. Then ask:
+*"review PR 128 and give me a sorted link."*
 
 ## Try the demo
 
@@ -102,11 +118,13 @@ what the gif above is recorded from.
 | Path | What |
 |------|------|
 | `extension/` | The Chrome extension (MV3): `manifest.json`, `content.js`, `background.js`, `styles.css`, `icons/` |
-| `skill/SKILL.md` | The agent skill explaining the integration |
+| `skills/pr-review-sorter/SKILL.md` | The agent skill explaining the integration |
 | `demo/` | Self-contained demo page used for the gif |
 | `test/` | `fixture.html` + `run-tests.mjs` (Playwright end-to-end tests) |
 | `scripts/` | `build-gif.mjs`, `make-icons.mjs` (Playwright + ffmpeg) |
+| `store/` | Chrome Web Store listing copy, screenshots, publishing guide |
 | `assets/demo.gif` | The demo recording |
+| `PRIVACY.md` | Privacy policy (no data collected) |
 
 ## Tests
 
