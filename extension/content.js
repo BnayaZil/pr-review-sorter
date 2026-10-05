@@ -269,10 +269,12 @@
 
   function makePanel(order, map) {
     const existing = document.getElementById("prrs-panel");
+    const wasCollapsed = !!existing && existing.classList.contains("prrs-collapsed");
     if (existing) existing.remove();
 
     const panel = document.createElement("div");
     panel.id = "prrs-panel";
+    if (wasCollapsed) panel.classList.add("prrs-collapsed");
 
     const head = document.createElement("div");
     head.className = "prrs-panel-head";
@@ -440,9 +442,13 @@
     if (!filesContainer) return { matched: 0, total: map.size };
 
     // Remember the native order once, so "Erase" can restore it without a reload.
-    if (!filesContainer.__prrsOriginal) {
-      filesContainer.__prrsOriginal = Array.prototype.slice.call(filesContainer.children);
-    }
+    // Files GitHub loads later (in batches) arrive after the ones already here.
+    const original =
+      filesContainer.__prrsOriginal ||
+      (filesContainer.__prrsOriginal = Array.prototype.slice.call(filesContainer.children));
+    map.forEach((el) => {
+      if (original.indexOf(el) < 0) original.push(el);
+    });
 
     // Desired sequence: ordered matches first, then anything the agent left out.
     const orderedEls = [];
@@ -452,6 +458,7 @@
       if (!el || seen.has(el)) return;
       seen.add(el);
       orderedEls.push(el);
+      const fresh = !el.hasAttribute("data-prrs-order");
       el.setAttribute("data-prrs-order", i + 1);
 
       // Badge in the file header (classic .file-header, or the new-UI diff region).
@@ -464,7 +471,7 @@
         header.insertBefore(makeBadge(i + 1, item.reason), header.firstChild);
       }
 
-      if (item.notes && item.notes.length) applyNotes(el, item.notes);
+      if (fresh && item.notes && item.notes.length) applyNotes(el, item.notes);
     });
 
     const leftovers = [];
@@ -596,6 +603,7 @@
   }
 
   let busy = false;
+  let decoratedCount = 0;
   let capturedUrlKey = null;
   // Resolve params once per URL so remote fetches don't repeat on every mutation.
   let resolvedUrlKey = null;
@@ -650,13 +658,16 @@
         await storeSet({ [KEY_ORDER(id)]: { files: paramsOrder, ts: Date.now() }, [KEY_DISMISS(id)]: false });
       }
       if (!isFilesView()) return; // only the files view has a diff to decorate
-      if (alreadyApplied()) return;
-      if (!collectFiles(document).size) return; // files not in the DOM yet
+      const fileCount = collectFiles(document).size;
+      if (!fileCount) return; // files not in the DOM yet
+      // GitHub loads big PRs' diffs in batches; sort again when more files arrive.
+      if (alreadyApplied() && fileCount === decoratedCount) return;
       const st = await storeGet([KEY_ORDER(id), KEY_DISMISS(id)]);
       const cached = st[KEY_ORDER(id)] && st[KEY_ORDER(id)].files;
       const order = chooseOrder(paramsOrder, cached, !!st[KEY_DISMISS(id)]);
       if (!order) return;
       const res = decorate(document, order);
+      decoratedCount = res.total;
       console.log("[pr-review-sorter] ordered", res.matched, "of", res.total, "files", paramsOrder ? "(from URL)" : "(from cache)");
     } finally {
       busy = false;

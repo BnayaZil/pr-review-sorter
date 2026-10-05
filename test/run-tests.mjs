@@ -214,6 +214,37 @@ const lazy = await page.evaluate(async () => {
 check("lazy diff: matched 4, none grey", lazy.res.matched === 4 && lazy.grey === 0, JSON.stringify(lazy));
 check("lazy diff: sorted into its place (last)", lazy.lastIsGen);
 
+console.log("\n[browser] classic UI — files GitHub loads in a later batch get sorted on the next pass");
+const batchOrder = [
+  { path: "src/alpha.ts", notes: [{ line: 2, text: "main" }] },
+  { path: "src/late.ts" },
+  { path: "src/mid.ts" },
+  { path: "src/zeta.ts" },
+];
+await page.goto(fixture + "#pr_order=" + core.encode(batchOrder));
+await page.waitForFunction("window.PRReviewSorter !== undefined");
+const batch = await page.evaluate(async () => {
+  const S = window.PRReviewSorter;
+  await S.applyFromLocation(document, location);
+  const greyBefore = document.querySelectorAll("#prrs-panel .prrs-missing").length;
+  const container = document.createElement("div");
+  container.className = "js-diff-progressive-container";
+  container.innerHTML =
+    '<div class="file js-file" data-tagsearch-path="src/late.ts"><div class="file-header"><div class="file-info"></div></div></div>';
+  document.getElementById("files").appendChild(container);
+  await S.applyFromLocation(document, location);
+  return {
+    greyBefore,
+    greyAfter: document.querySelectorAll("#prrs-panel .prrs-missing").length,
+    comments: document.querySelectorAll(".prrs-comment").length,
+    badges: document.querySelectorAll(".prrs-badge").length,
+    order: Array.from(document.querySelectorAll("#files > .file")).map((f) => f.getAttribute("data-tagsearch-path")),
+  };
+});
+check("batch: grey before the batch loads, none after", batch.greyBefore === 1 && batch.greyAfter === 0, JSON.stringify(batch));
+check("batch: late file sorted into place", batch.order.join(",") === "src/alpha.ts,src/late.ts,src/mid.ts,src/zeta.ts", batch.order.join(","));
+check("batch: second pass doesn't duplicate comments or badges", batch.comments === 1 && batch.badges === 4, JSON.stringify(batch));
+
 await browser.close();
 
 console.log("\n[node] remote (gist) wiring in resolveOrder");
