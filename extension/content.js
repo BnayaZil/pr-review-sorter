@@ -458,7 +458,6 @@
       if (!el || seen.has(el)) return;
       seen.add(el);
       orderedEls.push(el);
-      const fresh = !el.hasAttribute("data-prrs-order");
       el.setAttribute("data-prrs-order", i + 1);
 
       // Badge in the file header (classic .file-header, or the new-UI diff region).
@@ -471,7 +470,11 @@
         header.insertBefore(makeBadge(i + 1, item.reason), header.firstChild);
       }
 
-      if (fresh && item.notes && item.notes.length) applyNotes(el, item.notes);
+      // On /changes a file's diff can load after the file is sorted; its notes wait for it.
+      if (item.notes && item.notes.length && el.getAttribute("data-prrs-notes") !== "done") {
+        applyNotes(el, item.notes);
+        el.setAttribute("data-prrs-notes", el.querySelector(".prrs-hl") ? "done" : "pending");
+      }
     });
 
     const leftovers = [];
@@ -574,6 +577,7 @@
     root.querySelectorAll(".prrs-badge").forEach((n) => n.remove());
     root.querySelectorAll(".prrs-hl").forEach((n) => n.classList.remove("prrs-hl"));
     root.querySelectorAll("[data-prrs-order]").forEach((n) => n.removeAttribute("data-prrs-order"));
+    root.querySelectorAll("[data-prrs-notes]").forEach((n) => n.removeAttribute("data-prrs-notes"));
     const panel = document.getElementById("prrs-panel");
     if (panel) panel.remove();
     const c = filesContainerOf(root);
@@ -601,9 +605,13 @@
   function alreadyApplied() {
     return !!document.querySelector("[data-prrs-order]");
   }
+  function waitingNotesWithDiff() {
+    return document.querySelectorAll('[data-prrs-notes="pending"] table').length;
+  }
 
   let busy = false;
   let decoratedCount = 0;
+  let waitingCount = 0;
   let capturedUrlKey = null;
   // Resolve params once per URL so remote fetches don't repeat on every mutation.
   let resolvedUrlKey = null;
@@ -660,14 +668,15 @@
       if (!isFilesView()) return; // only the files view has a diff to decorate
       const fileCount = collectFiles(document).size;
       if (!fileCount) return; // files not in the DOM yet
-      // GitHub loads big PRs' diffs in batches; sort again when more files arrive.
-      if (alreadyApplied() && fileCount === decoratedCount) return;
+      // GitHub loads big PRs' diffs in batches; sort again when more files or awaited diffs arrive.
+      if (alreadyApplied() && fileCount === decoratedCount && waitingNotesWithDiff() === waitingCount) return;
       const st = await storeGet([KEY_ORDER(id), KEY_DISMISS(id)]);
       const cached = st[KEY_ORDER(id)] && st[KEY_ORDER(id)].files;
       const order = chooseOrder(paramsOrder, cached, !!st[KEY_DISMISS(id)]);
       if (!order) return;
       const res = decorate(document, order);
       decoratedCount = res.total;
+      waitingCount = waitingNotesWithDiff();
       console.log("[pr-review-sorter] ordered", res.matched, "of", res.total, "files", paramsOrder ? "(from URL)" : "(from cache)");
     } finally {
       busy = false;

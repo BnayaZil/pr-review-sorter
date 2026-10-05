@@ -214,6 +214,32 @@ const lazy = await page.evaluate(async () => {
 check("lazy diff: matched 4, none grey", lazy.res.matched === 4 && lazy.grey === 0, JSON.stringify(lazy));
 check("lazy diff: sorted into its place (last)", lazy.lastIsGen);
 
+console.log("\n[browser] NEW GitHub UI — notes wait for a diff that loads after sorting");
+await page.goto("about:blank");
+await page.goto(fixtureNew + "#pr_order=" + core.encode([...newOrder, { path: "packages/app/gen.md", notes: [{ line: 1, text: "late note" }] }]));
+await page.waitForFunction("window.PRReviewSorter !== undefined");
+const lateNotes = await page.evaluate(async () => {
+  const S = window.PRReviewSorter;
+  const entry = document.createElement("div");
+  entry.className = "PullRequestDiffsList-module__diffEntry__x";
+  entry.innerHTML = '<a href="#diff-GEN">packages/app/gen.md</a>';
+  document.querySelector('[data-testid="progressive-diffs-list"]').append(entry);
+  const count = () => entry.querySelectorAll(".prrs-comment").length;
+  await S.applyFromLocation(document, location);
+  const before = count();
+  entry.insertAdjacentHTML(
+    "beforeend",
+    '<table data-diff-anchor="diff-GEN" aria-label="Diff for packages/app/gen.md"><tbody><tr><td data-line-anchor="diff-GENR1">1</td><td>x</td></tr></tbody></table>'
+  );
+  await S.applyFromLocation(document, location);
+  const after = count();
+  await S.applyFromLocation(document, location);
+  return { before, after, again: count(), total: document.querySelectorAll(".prrs-comment").length };
+});
+check("late diff: no note before it loads", lateNotes.before === 0, JSON.stringify(lateNotes));
+check("late diff: note appears once it loads", lateNotes.after === 1, JSON.stringify(lateNotes));
+check("late diff: no duplicate notes on later passes", lateNotes.again === 1 && lateNotes.total === 2, JSON.stringify(lateNotes));
+
 console.log("\n[browser] classic UI — files GitHub loads in a later batch get sorted on the next pass");
 const batchOrder = [
   { path: "src/alpha.ts", notes: [{ line: 2, text: "main" }] },
