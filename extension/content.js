@@ -652,6 +652,9 @@
 
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id) {
     document.addEventListener("prrs:erase", erase);
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === "prrs-dev-reload" && alreadyApplied()) location.reload();
+    });
     // GitHub loads diffs progressively and navigates via Turbo; watch for both.
     const obs = new MutationObserver(() => run());
     obs.observe(document.documentElement, { childList: true, subtree: true });
