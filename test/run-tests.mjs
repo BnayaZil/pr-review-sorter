@@ -157,6 +157,28 @@ const fired = await page.evaluate(async () => {
 });
 check("clicking Erase dispatches prrs:erase", fired === true);
 
+console.log("\n[browser] panel floats by default, docks, pops back out");
+await applyAt(page, "#pr_order=" + plainToken);
+const layout = await page.evaluate(() => {
+  const panel = () => document.getElementById("prrs-panel");
+  const state = () => ({ docked: panel().classList.contains("prrs-docked"), margin: getComputedStyle(document.body).marginRight });
+  const out = { initial: state() };
+  panel().querySelector(".prrs-panel-mode").click();
+  out.docked = state();
+  panel().querySelector(".prrs-panel-toggle").click();
+  out.collapsed = state();
+  panel().querySelector(".prrs-panel-toggle").click();
+  panel().querySelector(".prrs-panel-mode").click();
+  out.popped = state();
+  out.saved = JSON.parse(localStorage.getItem("prrs:ui"));
+  return out;
+});
+check("floating by default, page unshifted", !layout.initial.docked && layout.initial.margin !== "300px", JSON.stringify(layout.initial));
+check("dock shifts the page 300px", layout.docked.docked && layout.docked.margin === "300px", JSON.stringify(layout.docked));
+check("collapsed dock shrinks to 44px", layout.collapsed.docked && layout.collapsed.margin === "44px", JSON.stringify(layout.collapsed));
+check("pop out floats it again", !layout.popped.docked && layout.popped.margin !== "300px", JSON.stringify(layout.popped));
+check("layout choice is saved", layout.saved && layout.saved.mode === "floating", JSON.stringify(layout.saved));
+
 console.log("\n[browser] storage round-trip (localStorage fallback)");
 const stored = await page.evaluate(async () => {
   const S = window.PRReviewSorter;
