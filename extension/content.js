@@ -272,6 +272,8 @@
     const docked = ui.mode === "docked";
     panel.classList.toggle("prrs-docked", docked);
     panel.classList.toggle("prrs-collapsed", ui.collapsed);
+    document.documentElement.classList.toggle("prrs-page-docked", docked);
+    document.documentElement.classList.toggle("prrs-page-collapsed", ui.collapsed);
     const mode = panel.querySelector(".prrs-panel-mode");
     mode.innerHTML = docked ? ICON_POPOUT : ICON_DOCK;
     mode.title = docked ? "Pop out" : "Dock to the side";
@@ -592,6 +594,7 @@
     root.querySelectorAll("[data-prrs-order]").forEach((n) => n.removeAttribute("data-prrs-order"));
     const panel = document.getElementById("prrs-panel");
     if (panel) panel.remove();
+    document.documentElement.classList.remove("prrs-page-docked", "prrs-page-collapsed");
     const c = filesContainerOf(root);
     if (c && c.__prrsOriginal) {
       c.__prrsOriginal.forEach((el) => {

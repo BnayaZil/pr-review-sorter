@@ -139,11 +139,12 @@
   background: transparent;
 }
 
-html:has(#prrs-panel.prrs-docked) body {
+/* A class on <html>, not html:has(), which made every keystroke in a comment box recheck the page's styles. */
+html.prrs-page-docked body {
   margin-right: 300px;
 }
 
-html:has(#prrs-panel.prrs-docked.prrs-collapsed) body {
+html.prrs-page-docked.prrs-page-collapsed body {
   margin-right: 44px;
 }
 
