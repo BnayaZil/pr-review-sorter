@@ -196,6 +196,24 @@ check("new UI: 1 inline comment", nu.comments === 1, "comments=" + nu.comments);
 check("new UI: line highlighted", nu.highlights >= 1, "hl=" + nu.highlights);
 check("new UI: order panel present", nu.panel);
 
+console.log("\n[browser] NEW GitHub UI — a file whose diff isn't loaded yet still matches by its header link");
+await page.goto(fixtureNew + "#pr_order=" + core.encode([...newOrder, { path: "packages/app/gen.md" }]));
+await page.waitForFunction("window.PRReviewSorter !== undefined");
+const lazy = await page.evaluate(async () => {
+  const entry = document.createElement("div");
+  entry.className = "PullRequestDiffsList-module__diffEntry__x";
+  entry.innerHTML = '<a href="#diff-GEN">\u200epackages/app/gen.md\u200e</a><div aria-label="Loading packages/app/gen.md"></div>';
+  document.querySelector('[data-testid="progressive-diffs-list"]').prepend(entry);
+  const res = await window.PRReviewSorter.applyFromLocation(document, location);
+  return {
+    res,
+    grey: document.querySelectorAll("#prrs-panel .prrs-missing").length,
+    lastIsGen: document.querySelector('[data-testid="progressive-diffs-list"]').lastElementChild === entry,
+  };
+});
+check("lazy diff: matched 4, none grey", lazy.res.matched === 4 && lazy.grey === 0, JSON.stringify(lazy));
+check("lazy diff: sorted into its place (last)", lazy.lastIsGen);
+
 await browser.close();
 
 console.log("\n[node] remote (gist) wiring in resolveOrder");

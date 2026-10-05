@@ -236,8 +236,18 @@
           el.querySelector(".file-info a[title]").getAttribute("title"));
       if (path && !map.has(path)) map.set(path, el);
     });
-    // New "Files changed" experience (/changes): each file is a
-    // <table data-diff-anchor aria-label="…path"> inside a div[class*="diffEntry"].
+    // New "Files changed" experience (/changes): each file is a div[class*="diffEntry"].
+    // Its header link (a[href="#diff-<sha>"]) names the path even before the diff loads
+    // and for generated files that need "Load Diff"; the table appears only once loaded.
+    if (!map.size) {
+      root.querySelectorAll('[class*="diffEntry"]').forEach((unit) => {
+        const link = unit.querySelector('a[href^="#diff-"]');
+        const table = unit.querySelector("table[data-diff-anchor]");
+        const label =
+          (link && link.textContent.replace(/\u200e/g, "").trim()) || (table && table.getAttribute("aria-label"));
+        if (label && !map.has(label)) map.set(label, unit);
+      });
+    }
     if (!map.size) {
       root.querySelectorAll("table[data-diff-anchor]").forEach((t) => {
         const label = t.getAttribute("aria-label");
@@ -281,7 +291,10 @@
       const li = document.createElement("li");
       li.className = "prrs-panel-item";
       const el = matchFile(map, item.path);
-      if (!el) li.classList.add("prrs-missing");
+      if (!el) {
+        li.classList.add("prrs-missing");
+        li.title = "This file isn't on the page. It may not be loaded yet, or it isn't part of this PR.";
+      }
 
       const num = document.createElement("span");
       num.className = "prrs-panel-num";
