@@ -158,6 +158,10 @@ node test/run-tests.mjs
 Covers every carrier (hash, query, compressed), the inflate performance of a large
 compressed plan, and the remote-gist wiring.
 
+**Every PR must also be tested by hand on both Files-changed experiences** — the classic
+`/files` page and the new `/changes` page. They have different DOMs, so a change that works
+on one can break the other.
+
 ## Rebuild the gif / icons
 
 ```bash

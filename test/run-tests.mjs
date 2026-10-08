@@ -218,6 +218,81 @@ check("new UI: 1 inline comment", nu.comments === 1, "comments=" + nu.comments);
 check("new UI: line highlighted", nu.highlights >= 1, "hl=" + nu.highlights);
 check("new UI: order panel present", nu.panel);
 
+console.log("\n[browser] NEW GitHub UI — a file whose diff isn't loaded yet still matches by its header link");
+await page.goto(fixtureNew + "#pr_order=" + core.encode([...newOrder, { path: "packages/app/gen.md" }]));
+await page.waitForFunction("window.PRReviewSorter !== undefined");
+const lazy = await page.evaluate(async () => {
+  const entry = document.createElement("div");
+  entry.className = "PullRequestDiffsList-module__diffEntry__x";
+  entry.innerHTML = '<a href="#diff-GEN">\u200epackages/app/gen.md\u200e</a><div aria-label="Loading packages/app/gen.md"></div>';
+  document.querySelector('[data-testid="progressive-diffs-list"]').prepend(entry);
+  const res = await window.PRReviewSorter.applyFromLocation(document, location);
+  return {
+    res,
+    grey: document.querySelectorAll("#prrs-panel .prrs-missing").length,
+    lastIsGen: document.querySelector('[data-testid="progressive-diffs-list"]').lastElementChild === entry,
+  };
+});
+check("lazy diff: matched 4, none grey", lazy.res.matched === 4 && lazy.grey === 0, JSON.stringify(lazy));
+check("lazy diff: sorted into its place (last)", lazy.lastIsGen);
+
+console.log("\n[browser] NEW GitHub UI — notes wait for a diff that loads after sorting");
+await page.goto("about:blank");
+await page.goto(fixtureNew + "#pr_order=" + core.encode([...newOrder, { path: "packages/app/gen.md", notes: [{ line: 1, text: "late note" }] }]));
+await page.waitForFunction("window.PRReviewSorter !== undefined");
+const lateNotes = await page.evaluate(async () => {
+  const S = window.PRReviewSorter;
+  const entry = document.createElement("div");
+  entry.className = "PullRequestDiffsList-module__diffEntry__x";
+  entry.innerHTML = '<a href="#diff-GEN">packages/app/gen.md</a>';
+  document.querySelector('[data-testid="progressive-diffs-list"]').append(entry);
+  const count = () => entry.querySelectorAll(".prrs-comment").length;
+  await S.applyFromLocation(document, location);
+  const before = count();
+  entry.insertAdjacentHTML(
+    "beforeend",
+    '<table data-diff-anchor="diff-GEN" aria-label="Diff for packages/app/gen.md"><tbody><tr><td data-line-anchor="diff-GENR1">1</td><td>x</td></tr></tbody></table>'
+  );
+  await S.applyFromLocation(document, location);
+  const after = count();
+  await S.applyFromLocation(document, location);
+  return { before, after, again: count(), total: document.querySelectorAll(".prrs-comment").length };
+});
+check("late diff: no note before it loads", lateNotes.before === 0, JSON.stringify(lateNotes));
+check("late diff: note appears once it loads", lateNotes.after === 1, JSON.stringify(lateNotes));
+check("late diff: no duplicate notes on later passes", lateNotes.again === 1 && lateNotes.total === 2, JSON.stringify(lateNotes));
+
+console.log("\n[browser] classic UI — files GitHub loads in a later batch get sorted on the next pass");
+const batchOrder = [
+  { path: "src/alpha.ts", notes: [{ line: 2, text: "main" }] },
+  { path: "src/late.ts" },
+  { path: "src/mid.ts" },
+  { path: "src/zeta.ts" },
+];
+await page.goto(fixture + "#pr_order=" + core.encode(batchOrder));
+await page.waitForFunction("window.PRReviewSorter !== undefined");
+const batch = await page.evaluate(async () => {
+  const S = window.PRReviewSorter;
+  await S.applyFromLocation(document, location);
+  const greyBefore = document.querySelectorAll("#prrs-panel .prrs-missing").length;
+  const container = document.createElement("div");
+  container.className = "js-diff-progressive-container";
+  container.innerHTML =
+    '<div class="file js-file" data-tagsearch-path="src/late.ts"><div class="file-header"><div class="file-info"></div></div></div>';
+  document.getElementById("files").appendChild(container);
+  await S.applyFromLocation(document, location);
+  return {
+    greyBefore,
+    greyAfter: document.querySelectorAll("#prrs-panel .prrs-missing").length,
+    comments: document.querySelectorAll(".prrs-comment").length,
+    badges: document.querySelectorAll(".prrs-badge").length,
+    order: Array.from(document.querySelectorAll("#files > .file")).map((f) => f.getAttribute("data-tagsearch-path")),
+  };
+});
+check("batch: grey before the batch loads, none after", batch.greyBefore === 1 && batch.greyAfter === 0, JSON.stringify(batch));
+check("batch: late file sorted into place", batch.order.join(",") === "src/alpha.ts,src/late.ts,src/mid.ts,src/zeta.ts", batch.order.join(","));
+check("batch: second pass doesn't duplicate comments or badges", batch.comments === 1 && batch.badges === 4, JSON.stringify(batch));
+
 await browser.close();
 
 console.log("\n[node] remote (gist) wiring in resolveOrder");
