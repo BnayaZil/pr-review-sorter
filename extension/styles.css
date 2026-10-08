@@ -110,14 +110,67 @@
   font-size: 13px;
 }
 
-.prrs-panel-toggle {
-  border: 0;
+/* Docked: a full-height right column, like GitHub's file tree; the page shifts left to make room. */
+#prrs-panel.prrs-docked {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  max-height: none;
+  z-index: 99;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#prrs-panel.prrs-docked.prrs-collapsed {
+  width: 44px;
+}
+
+#prrs-panel.prrs-docked.prrs-collapsed .prrs-panel-title,
+#prrs-panel.prrs-docked.prrs-collapsed .prrs-erase,
+#prrs-panel.prrs-docked.prrs-collapsed .prrs-panel-mode {
+  display: none;
+}
+
+#prrs-panel.prrs-docked.prrs-collapsed .prrs-panel-head {
+  justify-content: center;
+  padding: 8px 0;
+  border-bottom: 0;
   background: transparent;
-  color: inherit;
+}
+
+/* A class on <html>, not html:has(), which made every keystroke in a comment box recheck the page's styles. */
+html.prrs-page-docked body {
+  margin-right: 300px;
+}
+
+html.prrs-page-docked.prrs-page-collapsed body {
+  margin-right: 44px;
+}
+
+.prrs-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--prrs-fg-muted);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
-  padding: 0 4px;
+}
+
+.prrs-icon-btn:hover {
+  background: var(--prrs-border);
+  color: var(--prrs-fg);
+}
+
+.prrs-icon-btn svg {
+  fill: currentColor;
 }
 
 .prrs-panel-actions {

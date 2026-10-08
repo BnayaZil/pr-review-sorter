@@ -40,3 +40,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   })();
   return true; // keep the message channel open for the async response
 });
+
+// Dev only: an unpacked install polls its own files and, on change, reloads open PR
+// tabs and itself. Inert in the store build (installType "normal").
+// ponytail: 1s full-file polling, swap for a file-watcher dev server if it ever feels slow.
+const DEV_FILES = ["manifest.json", "background.js", "content.js", "styles.css"];
+
+async function devSnapshot() {
+  const texts = await Promise.all(DEV_FILES.map((f) => fetch(f, { cache: "no-store" }).then((r) => r.text())));
+  return texts.join("\0");
+}
+
+async function devReload() {
+  const tabs = await chrome.tabs.query({});
+  await Promise.allSettled(tabs.map((t) => chrome.tabs.sendMessage(t.id, { type: "prrs-dev-reload" })));
+  chrome.runtime.reload();
+}
+
+chrome.runtime.onStartup.addListener(() => {}); // wake the worker at browser start so the watcher runs
+chrome.management.getSelf().then(async (self) => {
+  if (self.installType !== "development") return;
+  let last = await devSnapshot();
+  setInterval(async () => {
+    await chrome.runtime.getPlatformInfo(); // an extension API call keeps the MV3 worker from idling out
+    const now = await devSnapshot();
+    if (now !== last) devReload();
+  }, 1000);
+});

@@ -50,6 +50,9 @@ inline comments all apply on either.
 3. **Load unpacked** → select the `extension/` folder.
 4. Open any `…/pull/<n>/files#pr_order=…` link.
 
+An unpacked install auto-reloads: when you save a file in `extension/`, it reloads
+itself and every PR tab that's showing a sort, within about a second.
+
 > **Pairs with an agent skill** — [`skills/pr-review-sorter`](skills/pr-review-sorter/SKILL.md) teaches a
 > code agent to generate these links. Install it with `npx skills add BnayaZil/pr-review-sorter` (see below).
 
