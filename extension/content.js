@@ -257,6 +257,37 @@
     return badge;
   }
 
+  // Octicons sidebar-collapse-16, sidebar-expand-16, link-external-16 (mirrored, so the arrow points left, away from the dock); DOCK is the sidebar frame with its right column filled.
+  const SIDEBAR_FRAME = "M1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0ZM1.5 1.75v12.5c0 .138.112.25.25.25H9.5v-13H1.75a.25.25 0 0 0-.25.25ZM11 14.5h3.25a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25H11Z";
+  const svg = (inner) => '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">' + inner + "</svg>";
+  const ICON_COLLAPSE = svg('<path d="M6.823 7.823a.25.25 0 0 1 0 .354l-2.396 2.396A.25.25 0 0 1 4 10.396V5.604a.25.25 0 0 1 .427-.177Z"/><path d="' + SIDEBAR_FRAME + '"/>');
+  const ICON_EXPAND = svg('<path d="m4.177 7.823 2.396-2.396A.25.25 0 0 1 7 5.604v4.792a.25.25 0 0 1-.427.177L4.177 8.177a.25.25 0 0 1 0-.354Z"/><path d="' + SIDEBAR_FRAME + '"/>');
+  const ICON_DOCK = svg('<path d="' + SIDEBAR_FRAME + '"/><rect x="11" y="1.5" width="3.5" height="13" rx=".25"/>');
+  const ICON_POPOUT = svg('<path transform="matrix(-1 0 0 1 16 0)" d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"/>');
+
+  /** Panel layout, shared by every PR: floating (default) or docked to the right edge; either can be collapsed. */
+  let ui = { mode: "floating", collapsed: false };
+
+  function renderPanel(panel) {
+    const docked = ui.mode === "docked";
+    panel.classList.toggle("prrs-docked", docked);
+    panel.classList.toggle("prrs-collapsed", ui.collapsed);
+    document.documentElement.classList.toggle("prrs-page-docked", docked);
+    document.documentElement.classList.toggle("prrs-page-collapsed", ui.collapsed);
+    const mode = panel.querySelector(".prrs-panel-mode");
+    mode.innerHTML = docked ? ICON_POPOUT : ICON_DOCK;
+    mode.title = docked ? "Pop out" : "Dock to the side";
+    const toggle = panel.querySelector(".prrs-panel-toggle");
+    toggle.innerHTML = !docked ? "–" : ui.collapsed ? ICON_EXPAND : ICON_COLLAPSE;
+    toggle.title = ui.collapsed ? "Expand" : "Collapse";
+  }
+
+  function setUi(panel, patch) {
+    ui = Object.assign({}, ui, patch);
+    renderPanel(panel);
+    storeSet({ [KEY_UI]: ui });
+  }
+
   function makePanel(order, map) {
     const existing = document.getElementById("prrs-panel");
     if (existing) existing.remove();
@@ -270,7 +301,8 @@
       '<span class="prrs-panel-title">Review order</span>' +
       '<span class="prrs-panel-actions">' +
       '<button class="prrs-erase" title="Erase sorting and restore GitHub\'s order">Erase</button>' +
-      '<button class="prrs-panel-toggle" title="Collapse">–</button>' +
+      '<button class="prrs-icon-btn prrs-panel-mode"></button>' +
+      '<button class="prrs-icon-btn prrs-panel-toggle"></button>' +
       "</span>";
     panel.appendChild(head);
 
@@ -322,8 +354,13 @@
     panel.appendChild(list);
     head.querySelector(".prrs-panel-toggle").addEventListener("click", (e) => {
       e.stopPropagation();
-      panel.classList.toggle("prrs-collapsed");
+      setUi(panel, { collapsed: !ui.collapsed });
     });
+    head.querySelector(".prrs-panel-mode").addEventListener("click", (e) => {
+      e.stopPropagation();
+      setUi(panel, { mode: ui.mode === "docked" ? "floating" : "docked", collapsed: false });
+    });
+    renderPanel(panel);
     const eraseBtn = head.querySelector(".prrs-erase");
     if (eraseBtn) {
       eraseBtn.addEventListener("click", (e) => {
@@ -485,6 +522,7 @@
   }
   const KEY_ORDER = (id) => "prrs:order:" + id;
   const KEY_DISMISS = (id) => "prrs:dismissed:" + id;
+  const KEY_UI = "prrs:ui";
 
   function hasChromeStorage() {
     return typeof chrome !== "undefined" && chrome.storage && chrome.storage.local;
@@ -556,6 +594,7 @@
     root.querySelectorAll("[data-prrs-order]").forEach((n) => n.removeAttribute("data-prrs-order"));
     const panel = document.getElementById("prrs-panel");
     if (panel) panel.remove();
+    document.documentElement.classList.remove("prrs-page-docked", "prrs-page-collapsed");
     const c = filesContainerOf(root);
     if (c && c.__prrsOriginal) {
       c.__prrsOriginal.forEach((el) => {
@@ -639,7 +678,8 @@
       if (!isFilesView()) return; // only the files view has a diff to decorate
       if (alreadyApplied()) return;
       if (!collectFiles(document).size) return; // files not in the DOM yet
-      const st = await storeGet([KEY_ORDER(id), KEY_DISMISS(id)]);
+      const st = await storeGet([KEY_ORDER(id), KEY_DISMISS(id), KEY_UI]);
+      if (st[KEY_UI]) ui = st[KEY_UI];
       const cached = st[KEY_ORDER(id)] && st[KEY_ORDER(id)].files;
       const order = chooseOrder(paramsOrder, cached, !!st[KEY_DISMISS(id)]);
       if (!order) return;
