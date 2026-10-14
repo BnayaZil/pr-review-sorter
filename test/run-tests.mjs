@@ -218,6 +218,28 @@ check("new UI: 1 inline comment", nu.comments === 1, "comments=" + nu.comments);
 check("new UI: line highlighted", nu.highlights >= 1, "hl=" + nu.highlights);
 check("new UI: order panel present", nu.panel);
 
+const viewedNew = await page.evaluate(() => {
+  const S = window.PRReviewSorter;
+  const unit = S.matchFile(S.collectFiles(document), "packages/app/mid.ts");
+  unit.insertAdjacentHTML("afterbegin", '<button class="prc-Button-ButtonBase-9n-Xk viewed__ObsxMH" aria-label="Viewed" aria-pressed="true">Viewed</button>');
+  const panel = document.getElementById("prrs-panel");
+  S.syncViewed(panel, S.collectFiles(document));
+  return Array.from(panel.querySelectorAll(".prrs-panel-item")).map((li) => li.classList.contains("prrs-viewed"));
+});
+check("new UI: a pressed Viewed button marks only that panel row", JSON.stringify(viewedNew) === "[false,true,false]", JSON.stringify(viewedNew));
+
+await applyAt(page, "#pr_order=" + plainToken);
+const viewedClassic = await page.evaluate(() => {
+  const S = window.PRReviewSorter;
+  const file = document.querySelector('[data-tagsearch-path="src/alpha.ts"] .file-header');
+  file.insertAdjacentHTML("beforeend", '<input type="checkbox" class="js-reviewed-checkbox" checked>');
+  const panel = document.getElementById("prrs-panel");
+  S.syncViewed(panel, S.collectFiles(document));
+  const first = panel.querySelector(".prrs-panel-item");
+  return { viewed: first.classList.contains("prrs-viewed"), reason: first.querySelector(".prrs-panel-reason").textContent };
+});
+check("classic: a checked Viewed box marks the row and keeps its reason", viewedClassic.viewed && viewedClassic.reason === "entry", JSON.stringify(viewedClassic));
+
 console.log("\n[browser] NEW GitHub UI — a file whose diff isn't loaded yet still matches by its header link");
 await page.goto(fixtureNew + "#pr_order=" + core.encode([...newOrder, { path: "packages/app/gen.md" }]));
 await page.waitForFunction("window.PRReviewSorter !== undefined");
