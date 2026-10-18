@@ -13,9 +13,15 @@ lines with your own comments; the extension applies both.
 ## Steps
 
 1. **Get the file list.** `gh pr view <n> --json files -q '.files[].path'` (or read the diff).
-2. **Order for a human reviewer**, not alphabetically. A good default:
-   entry points / API surface → core logic → callers → config/schema → generated
-   or vendored files → tests last. Group related files together.
+2. **Order for a human reviewer**, not alphabetically. Follow the request path:
+   start at the entry point (HTTP route, CLI command, UI page, event handler) and go
+   one hop at a time, in the order the code calls them
+   (e.g. gateway controller → RPC/service controller → service → repository/schema).
+   Put each supporting type (DTO, enum, interface, constant) right after the first
+   file in the path that uses it, or group them after the path when they are small.
+   Then: config/schema changes not on the path → generated or vendored files → tests last.
+   If the PR has a design or decisions doc, put it first.
+   When the PR has several independent paths, finish one path before starting the next.
 3. **Write one short reason per file** (why it's here in the order). Reasons are optional but make the link far more useful.
 4. **Build the link** (see below) and give it to the user.
 
