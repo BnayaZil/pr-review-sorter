@@ -1,0 +1,12 @@
+{
+  "name": "pr-review-sorter",
+  "version": "1.2.1",
+  "description": "Turn a GitHub PR into a guided, review-ordered link — changed files sorted for review, with inline highlights and comments. Pairs with the PR Review Sorter Chrome extension.",
+  "author": {
+    "name": "BnayaZil"
+  },
+  "homepage": "https://github.com/BnayaZil/pr-review-sorter",
+  "repository": "https://github.com/BnayaZil/pr-review-sorter",
+  "license": "MIT",
+  "icon": "./extension/icons/icon128.png"
+}

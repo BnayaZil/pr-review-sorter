@@ -1,0 +1,19 @@
+{
+  "name": "pr-review-sorter",
+  "owner": {
+    "name": "BnayaZil"
+  },
+  "metadata": {
+    "description": "Claude Code plugin for the PR Review Sorter Chrome extension: turns a GitHub PR into a review-ordered link."
+  },
+  "plugins": [
+    {
+      "name": "pr-review-sorter",
+      "source": "./",
+      "description": "Turn a GitHub PR into a guided, review-ordered link — changed files sorted for review, with inline highlights and comments. Pairs with the PR Review Sorter Chrome extension.",
+      "version": "1.2.1",
+      "homepage": "https://github.com/BnayaZil/pr-review-sorter",
+      "license": "MIT"
+    }
+  ]
+}

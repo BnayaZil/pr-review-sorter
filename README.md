@@ -126,6 +126,13 @@ npx skills add BnayaZil/pr-review-sorter          # into ./.claude/skills (this 
 npx skills add BnayaZil/pr-review-sorter -g       # or globally, for every project
 ```
 
+Or install it as a Claude Code plugin — the repo is its own marketplace:
+
+```
+/plugin marketplace add BnayaZil/pr-review-sorter
+/plugin install pr-review-sorter@pr-review-sorter
+```
+
 Or copy `skills/pr-review-sorter/` into `~/.claude/skills/` by hand. Then ask:
 *"review PR 128 and give me a sorted link."*
 
