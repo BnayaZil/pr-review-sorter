@@ -118,16 +118,20 @@
     const bytes = b64urlToBytes(token);
     if (typeof DecompressionStream === "undefined") throw new Error("DecompressionStream unavailable");
     const ds = new DecompressionStream("deflate-raw");
-    const stream = new Blob([bytes]).stream().pipeThrough(ds);
-    const buf = await new Response(stream).arrayBuffer();
-    return new TextDecoder().decode(buf);
+    // Not via Blob: WebKit content scripts (Yab) throw "Invalid type should be ArrayBuffer" on Blob.stream().pipeThrough.
+    const writer = ds.writable.getWriter();
+    writer.write(bytes).catch(() => {});
+    writer.close().catch(() => {});
+    return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer());
   }
 
   /** Compress a UTF-8 string to a raw-DEFLATE base64url token. Async; used by tests/tools. */
   async function deflateToken(str) {
     const cs = new CompressionStream("deflate-raw");
-    const stream = new Blob([new TextEncoder().encode(str)]).stream().pipeThrough(cs);
-    const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+    const writer = cs.writable.getWriter();
+    writer.write(new TextEncoder().encode(str)).catch(() => {});
+    writer.close().catch(() => {});
+    const buf = new Uint8Array(await new Response(cs.readable).arrayBuffer());
     let bin = "";
     for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
     return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
