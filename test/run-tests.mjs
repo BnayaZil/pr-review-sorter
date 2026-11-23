@@ -1,12 +1,12 @@
 /*
  * End-to-end tests for PR Review Sorter.
- *   npm i playwright && npx playwright install chromium
+ *   npm i playwright && npx playwright install chromium webkit
  *   node test/run-tests.mjs
  *
  * Covers: hash carrier, query carrier, compressed carrier (pr_order_z) incl.
  * inflate performance, and the remote (gist) wiring in content.js.
  */
-import { chromium } from "playwright";
+import { chromium, webkit } from "playwright";
 import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
@@ -101,11 +101,20 @@ r = await applyAt(page, "?pr_order=" + plainToken);
 check("applied", r.res.applied);
 check("reordered", JSON.stringify(r.order) === JSON.stringify(EXPECTED), r.order.join(","));
 
-console.log("\n[browser] compressed carrier (#pr_order_z=)");
-r = await applyAt(page, "#pr_order_z=" + zToken);
-check("applied", r.res.applied);
-check("reordered", JSON.stringify(r.order) === JSON.stringify(EXPECTED), r.order.join(","));
-check("comments present", r.comments === 2, "comments=" + r.comments);
+const webkitBrowser = await webkit.launch();
+for (const [engine, p] of [["chromium", page], ["webkit", await webkitBrowser.newPage()]]) {
+  console.log(`\n[browser:${engine}] compressed carrier (#pr_order_z=)`);
+  r = await applyAt(p, "#pr_order_z=" + zToken);
+  check("applied", r.res.applied);
+  check("reordered", JSON.stringify(r.order) === JSON.stringify(EXPECTED), r.order.join(","));
+  check("comments present", r.comments === 2, "comments=" + r.comments);
+  const roundTrip = await p.evaluate(async (s) => {
+    const S = window.PRReviewSorter;
+    return (await S.inflateToken(await S.deflateToken(s))) === s;
+  }, planJson);
+  check("deflateToken -> inflateToken round-trips", roundTrip);
+}
+await webkitBrowser.close();
 
 console.log("\n[browser] compression performance (inflate + JSON.parse)");
 const bigFiles = [];

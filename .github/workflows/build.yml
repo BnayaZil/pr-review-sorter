@@ -22,8 +22,8 @@ jobs:
       - name: Install deps
         run: npm install
 
-      - name: Install Chromium (for tests)
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium + WebKit (for tests)
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Test (all URL carriers + gist wiring)
         run: npm test
