@@ -120,7 +120,8 @@
     const ds = new DecompressionStream("deflate-raw");
     // Not via Blob: WebKit content scripts (Yab) throw "Invalid type should be ArrayBuffer" on Blob.stream().pipeThrough.
     const writer = ds.writable.getWriter();
-    writer.write(bytes).catch(() => {});
+    // Firefox content scripts: the page-owned stream can't read a sandbox-owned Uint8Array; cloneInto copies it into the page.
+    writer.write(typeof cloneInto === "function" ? cloneInto(bytes, window) : bytes).catch(() => {});
     writer.close().catch(() => {});
     return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer());
   }
