@@ -4,6 +4,7 @@
   "version": "1.2.1",
   "description": "Reorders a GitHub PR's changed files and highlights/comments lines, from a review plan a code agent encodes in the URL.",
   "homepage_url": "https://github.com/BnayaZil/pr-review-sorter",
+  "minimum_chrome_version": "121",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -17,7 +18,10 @@
       "run_at": "document_idle"
     }
   ],
-  "background": { "service_worker": "background.js" },
+  "background": { "service_worker": "background.js", "scripts": ["background.js"] },
+  "browser_specific_settings": {
+    "gecko": { "id": "pr-review-sorter@bnayazil", "strict_min_version": "121.0" }
+  },
   "permissions": ["storage"],
   "host_permissions": [
     "https://api.github.com/*",
