@@ -50,6 +50,13 @@ inline comments all apply on either.
 3. **Load unpacked** → select the `extension/` folder.
 4. Open any `…/pull/<n>/files#pr_order=…` link.
 
+**Firefox / Zen (121+):** the same zip installs as an add-on. It isn't signed, so:
+
+- Temporary (until restart): `about:debugging` → **This Firefox** → **Load Temporary Add-on** → pick `extension/manifest.json`.
+- Permanent (Zen, Firefox Developer Edition/Nightly): set `xpinstall.signatures.required` to `false` in `about:config`,
+  then `about:addons` → ⚙ → **Install Add-on From File** → pick the zip (rename it to `.xpi` if the picker hides it).
+- If PR pages don't change, allow github.com under the add-on's **Permissions** tab.
+
 An unpacked install auto-reloads: when you save a file in `extension/`, it reloads
 itself and every PR tab that's showing a sort, within about a second.
 
